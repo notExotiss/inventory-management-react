@@ -1,65 +1,244 @@
-import Image from "next/image";
+"use client"
+
+import { useState } from "react"
+import { InventoryProvider, useInventory } from "@/lib/inventory-context"
+import { Item } from "@/lib/types"
+import { Header } from "@/components/header"
+import { FolderTree } from "@/components/folder-tree"
+import { InventoryTable } from "@/components/inventory-table"
+import { AddItemModal } from "@/components/modals/add-item-modal"
+import { NewLocationModal } from "@/components/modals/new-location-modal"
+import { GroupItemsModal } from "@/components/modals/group-items-modal"
+import { HelpModal } from "@/components/modals/help-modal"
+import { ItemDetailsModal } from "@/components/modals/item-details-modal"
+import { PhotoViewModal } from "@/components/modals/photo-view-modal"
+import { DndProviderWrapper } from "@/components/dnd-provider"
+
+function InventoryApp() {
+  const {
+    containers,
+    selectedContainer,
+    selectedItems,
+    searchQuery,
+    expandedContainers,
+    selectContainer,
+    toggleContainerExpansion,
+    addItem,
+    editItem,
+    deleteItems,
+    addLocation,
+    editLocation,
+    moveItems,
+    moveItemBetweenContainers,
+    toggleItemSelection,
+    selectAllItems,
+    deselectAllItems,
+    setSearchQuery,
+    findContainerById,
+    getFilteredItems
+  } = useInventory()
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event
+
+    if (!over) return
+
+    const activeData = active.data.current
+    const overData = over.data.current
+
+    if (!activeData || !overData) return
+
+    // Handle item being dropped on container
+    if (activeData.type === 'item' && overData.type === 'container') {
+      const itemId = active.id as string
+      const sourceContainerId = activeData.containerId as string
+      const targetContainerId = over.id as string
+
+      if (sourceContainerId !== targetContainerId) {
+        moveItemBetweenContainers(itemId, sourceContainerId, targetContainerId)
+      }
+    }
+
+    // Handle container being dropped on container (moving folders)
+    // Note: This would require a moveContainer function in the context
+    // For now, we'll just log it - you can implement this later
+    if (activeData.type === 'container' && overData.type === 'container') {
+      const containerId = active.id as string
+      const targetContainerId = over.id as string
+
+      if (containerId !== targetContainerId) {
+        // TODO: Implement container moving logic
+        console.log(`Move container ${containerId} to ${targetContainerId}`)
+      }
+    }
+  }
+
+  const [showAddItemModal, setShowAddItemModal] = useState(false)
+  const [showAddLocationModal, setShowAddLocationModal] = useState(false)
+  const [showGroupModal, setShowGroupModal] = useState(false)
+  const [showHelpModal, setShowHelpModal] = useState(false)
+  const [showItemDetailsModal, setShowItemDetailsModal] = useState(false)
+  const [showPhotoModal, setShowPhotoModal] = useState(false)
+  const [activeItem, setActiveItem] = useState<Item | null>(null)
+
+  const filteredItems = getFilteredItems()
+
+  const handleAddItem = (item: any) => {
+    addItem(item, selectedContainer || undefined)
+    setShowAddItemModal(false)
+  }
+
+  const handleAddLocation = (location: any) => {
+    addLocation(location, selectedContainer || undefined)
+    setShowAddLocationModal(false)
+  }
+
+  const handleGroupItems = (locationId: string) => {
+    moveItems(Array.from(selectedItems), locationId)
+    setShowGroupModal(false)
+  }
+
+  return (
+    <DndProviderWrapper onDragEnd={handleDragEnd}>
+      <div className="app-container">
+        <Header
+          searchQuery={searchQuery}
+          selectedItems={Array.from(selectedItems)}
+          onSearchChange={setSearchQuery}
+          onClearSelection={deselectAllItems}
+          onDelete={() => deleteItems(Array.from(selectedItems))}
+          onGroupIntoLocation={() => setShowGroupModal(true)}
+          onAddItem={() => setShowAddItemModal(true)}
+          onAddLocation={() => setShowAddLocationModal(true)}
+          onShowHelp={() => setShowHelpModal(true)}
+        />
+
+        <div className="main-content">
+          <div className="sidebar">
+          <FolderTree
+            containers={containers}
+            selectedContainer={selectedContainer}
+            expandedContainers={expandedContainers}
+            onContainerSelect={selectContainer}
+            onContainerToggle={toggleContainerExpansion}
+            onViewAllItems={() => selectContainer(null)}
+            onItemClick={(item) => {
+              setActiveItem(item)
+              setShowItemDetailsModal(true)
+            }}
+            onContainerEdit={editLocation}
+          />
+          </div>
+
+          <div className="content-area">
+            <div className="p-6">
+              <div className="mb-6">
+                <h2 className="text-2xl font-semibold mb-1">
+                  {selectedContainer ? (
+                    findContainerById(selectedContainer)?.containerName || 'Location'
+                  ) : filteredItems.length > 0 ? (
+                    `All Items (${filteredItems.length})`
+                  ) : (
+                    'Contents'
+                  )}
+                </h2>
+                {selectedContainer && (
+                  <p className="text-sm text-muted-foreground">
+                    {findContainerById(selectedContainer)?.containerLocation.path}
+                  </p>
+                )}
+              </div>
+
+              {filteredItems.length === 0 ? (
+                <div className="empty-state">
+                  <p className="text-muted-foreground mb-4">No items found</p>
+                  <button
+                    className="action-button mt-2"
+                    onClick={() => setShowAddItemModal(true)}
+                  >
+                    Add Item
+                  </button>
+                </div>
+              ) : (
+                <InventoryTable
+                  items={filteredItems}
+                  selectedItems={Array.from(selectedItems)}
+                  containerId={selectedContainer || undefined}
+                  onSelectItems={(items) => {
+                    deselectAllItems()
+                    items.forEach(itemId => toggleItemSelection(itemId))
+                  }}
+                  onViewItem={(item) => {
+                    setActiveItem(item)
+                    setShowItemDetailsModal(true)
+                  }}
+                  onViewPhoto={(item) => {
+                    setActiveItem(item)
+                    setShowPhotoModal(true)
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+      <AddItemModal
+        open={showAddItemModal}
+        onClose={() => setShowAddItemModal(false)}
+        onAddItem={handleAddItem}
+        defaultLocation={selectedContainer
+          ? findContainerById(selectedContainer)?.containerLocation.path || ''
+          : ''}
+      />
+
+      <NewLocationModal
+        open={showAddLocationModal}
+        onClose={() => setShowAddLocationModal(false)}
+        onAddLocation={handleAddLocation}
+      />
+
+      <GroupItemsModal
+        open={showGroupModal}
+        onClose={() => setShowGroupModal(false)}
+        onGroup={handleGroupItems}
+        containers={containers}
+        selectedItems={Array.from(selectedItems).map(id => {
+          const container = findContainerById(selectedContainer || '')
+          if (container && container.items) {
+            const item = container.items.find(item => item.id === id)
+            if (item) return item
+          }
+          return { id, itemName: 'Unknown item', itemLocation: { path: '' } }
+        })}
+      />
+
+      <HelpModal
+        open={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+      />
+
+      <ItemDetailsModal
+        open={showItemDetailsModal}
+        onClose={() => setShowItemDetailsModal(false)}
+        item={activeItem}
+        onEdit={editItem}
+        onAddItem={addItem}
+      />
+
+      <PhotoViewModal
+        open={showPhotoModal}
+        onClose={() => setShowPhotoModal(false)}
+        item={activeItem}
+      />
+      </div>
+    </DndProviderWrapper>
+  )
+}
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    <InventoryProvider>
+      <InventoryApp />
+    </InventoryProvider>
+  )
 }
