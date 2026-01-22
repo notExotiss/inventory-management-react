@@ -128,24 +128,34 @@ export function InventoryTable({
   const indeterminate = selectedItems.length > 0 && selectedItems.length < items.length
 
   return (
-    <div className="w-full overflow-x-auto rounded-lg border border-border bg-card">
+    <div className="w-full overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
       <Table.Table>
-        <Table.TableHeader className="bg-muted/50">
+        <Table.TableHeader className="bg-muted/30">
           <Table.TableRow>
             <Table.TableHead className="w-16 pl-4 pr-2">
               <button
                 className={cn(
-                  "flex h-5 w-5 items-center justify-center rounded-sm border border-gray-400 dark:border-gray-500 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm",
-                  allChecked && "bg-primary text-primary-foreground",
-                  indeterminate && "bg-primary text-primary-foreground"
+                  "flex h-5 w-5 items-center justify-center rounded-sm border shadow-sm transition-colors",
+                  "border-black dark:border-white",
+                  "hover:bg-gray-100 dark:hover:bg-gray-800"
                 )}
+                style={{
+                  backgroundColor: 'white',
+                  borderColor: 'black',
+                }}
+                onMouseEnter={(e) => {
+                  if (!document.documentElement.classList.contains('dark')) {
+                    e.currentTarget.style.backgroundColor = 'white'
+                    e.currentTarget.style.borderColor = 'black'
+                  }
+                }}
                 onClick={handleSelectAll}
                 aria-label="Select all items"
               >
                 {allChecked ? (
-                  <Icon icon="material-symbols:check" className="h-4 w-4" />
+                  <Icon icon="material-symbols:check" className="h-4 w-4" style={{ color: 'black' }} />
                 ) : indeterminate ? (
-                  <Icon icon="material-symbols:horizontal-rule" className="h-4 w-4" />
+                  <Icon icon="material-symbols:horizontal-rule" className="h-4 w-4" style={{ color: 'black' }} />
                 ) : null}
               </button>
             </Table.TableHead>
@@ -180,15 +190,12 @@ export function InventoryTable({
             <Table.TableHead className="w-20">
               Photo
             </Table.TableHead>
-            <Table.TableHead className="w-16">
-              Info
-            </Table.TableHead>
           </Table.TableRow>
         </Table.TableHeader>
         <Table.TableBody>
           {sortedItems.length === 0 ? (
             <Table.TableRow>
-              <Table.TableCell className="h-24 text-center text-muted-foreground" colSpan={6}>
+              <Table.TableCell className="h-24 text-center text-muted-foreground" colSpan={5}>
                 No items found.
               </Table.TableCell>
             </Table.TableRow>
@@ -201,9 +208,18 @@ export function InventoryTable({
                 asTableRow={true}
               >
                 <Table.TableRow
-                  className="hover cursor-pointer transition-all duration-200"
-                  onClick={() => handleRowClick(item)}
-                  onKeyDown={(e) => handleKeyDown(e, item)}
+                  className="hover cursor-pointer transition-all duration-300 animate-in fade-in slide-in-from-left-2 hover:bg-muted/70 dark:hover:bg-muted/50"
+                  onClick={() => {
+                    handleRowClick(item)
+                    onViewPhoto(item)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleRowClick(item)
+                      onViewPhoto(item)
+                    }
+                  }}
                   tabIndex={0}
                   role="button"
                 >
@@ -211,14 +227,25 @@ export function InventoryTable({
                   <div onClick={(e) => e.stopPropagation()}>
                     <button
                       className={cn(
-                        "flex h-5 w-5 items-center justify-center rounded-sm border border-gray-400 dark:border-gray-500 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm transition-colors",
-                        selectedItems.includes(item.id) && "bg-primary text-primary-foreground"
+                        "flex h-5 w-5 items-center justify-center rounded-sm border shadow-sm transition-colors",
+                        "border-black dark:border-white",
+                        "hover:bg-gray-100 dark:hover:bg-gray-800"
                       )}
+                      style={{
+                        backgroundColor: 'white',
+                        borderColor: 'black',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!document.documentElement.classList.contains('dark')) {
+                          e.currentTarget.style.backgroundColor = 'white'
+                          e.currentTarget.style.borderColor = 'black'
+                        }
+                      }}
                       onClick={(e) => handleSelectItem(item.id, e)}
                       aria-label={`Select ${item.itemName}`}
                     >
                       {selectedItems.includes(item.id) && (
-                        <Icon icon="material-symbols:check" className="h-4 w-4" />
+                        <Icon icon="material-symbols:check" className="h-4 w-4" style={{ color: 'black' }} />
                       )}
                     </button>
                   </div>
@@ -235,9 +262,15 @@ export function InventoryTable({
                 </Table.TableCell>
                 <Table.TableCell className="px-4 py-3">
                   <div
-                    className="relative w-12 h-12 overflow-hidden rounded-md border-2 border-border cursor-pointer hover:border-primary transition-all duration-200 hover:scale-105"
-                    onClick={(e) => handlePhotoClick(item, e)}
-                    onKeyDown={(e) => handlePhotoKeyDown(e, item)}
+                    className="relative w-12 h-12 overflow-hidden rounded-md cursor-pointer hover:opacity-80 transition-all duration-200 hover:scale-105"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handlePhotoClick(item, e)
+                    }}
+                    onKeyDown={(e) => {
+                      e.stopPropagation()
+                      handlePhotoKeyDown(e, item)
+                    }}
                     tabIndex={0}
                     role="button"
                     aria-label={`View photo for ${item.itemName}`}
@@ -249,18 +282,6 @@ export function InventoryTable({
                       onError={handleImageError}
                     />
                   </div>
-                </Table.TableCell>
-                <Table.TableCell className="px-4 py-3">
-                  <button
-                    className="p-1.5 rounded-md hover:bg-muted transition-all duration-200 hover:scale-110"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onViewItem(item)
-                    }}
-                    aria-label={`View details for ${item.itemName}`}
-                  >
-                    <Icon icon="material-symbols:info-outline" className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
-                  </button>
                 </Table.TableCell>
                 </Table.TableRow>
               </DraggableItem>

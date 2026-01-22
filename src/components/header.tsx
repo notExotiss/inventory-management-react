@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Trash2, FolderPlus, Plus, FolderUp, HelpCircle } from "lucide-react"
+import { Trash2, FolderPlus, Plus, FolderUp, HelpCircle, Undo2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "./theme-toggle"
 import { SearchBar } from "./search-bar"
@@ -16,6 +16,8 @@ interface HeaderProps {
   onAddItem: () => void
   onAddLocation: () => void
   onShowHelp: () => void
+  onUndo: () => void
+  canUndo: boolean
 }
 
 export function Header({
@@ -27,12 +29,14 @@ export function Header({
   onGroupIntoLocation,
   onAddItem,
   onAddLocation,
-  onShowHelp
+  onShowHelp,
+  onUndo,
+  canUndo
 }: HeaderProps) {
   const logo = '/2554_logo.png'
 
   return (
-    <header className="sticky top-0 z-50 w-full flex items-center px-4 py-3 shadow-lg bg-base-100 border-b border-base-300">
+    <header className="sticky top-0 z-50 w-full flex items-center px-4 py-3 shadow-lg bg-background/95 backdrop-blur-sm border-b border-border animate-in slide-in-from-top duration-300">
       {/* Left: Logo and Title */}
       <div className="flex items-center">
         <img
@@ -95,6 +99,15 @@ export function Header({
                   </Button>
           </>
         )}
+              <Button
+                className="btn btn-ghost btn-sm"
+                onClick={onUndo}
+                disabled={!canUndo}
+                aria-label="Undo"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo2 className="h-4 w-4" />
+              </Button>
               <Button
                 className="btn btn-ghost btn-sm"
                 onClick={onShowHelp}

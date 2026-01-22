@@ -26,7 +26,7 @@ export function PhotoViewModal({ open, onClose, item }: PhotoViewModalProps) {
 
   return (
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[600px] modal-box bg-base-100">
+        <DialogContent className="sm:max-w-[600px] bg-background">
         <DialogHeader>
           <DialogTitle>{item.itemName}</DialogTitle>
           <DialogDescription>

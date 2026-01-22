@@ -40,7 +40,7 @@ export function SearchBar({
         placeholder={placeholder}
         value={value}
         onChange={handleChange}
-        className="pl-8 pr-8 w-full h-9"
+        className="pl-8 pr-8 w-full h-9 transition-all duration-200 focus:scale-[1.02] focus:shadow-md"
       />
 
       {value && (

@@ -45,6 +45,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               <li>Use "Delete" to remove selected items</li>
               <li>Use "Group" to move items to different locations</li>
               <li>Click on any item to view/edit its details</li>
+              <li>To add a similar item, click on the location you want to add it to first and then proceed</li>
             </ul>
           </div>
 

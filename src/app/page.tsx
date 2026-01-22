@@ -1,17 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { InventoryProvider, useInventory } from "@/lib/inventory-context"
-import { Item } from "@/lib/types"
+import { Item, Container } from "@/lib/types"
 import { Header } from "@/components/header"
+import { MobileHeader } from "@/components/mobile-header"
 import { FolderTree } from "@/components/folder-tree"
+import { MobileAccordionView } from "@/components/mobile-accordion-view"
+import { MobileAllItemsView } from "@/components/mobile-all-items-view"
 import { InventoryTable } from "@/components/inventory-table"
 import { AddItemModal } from "@/components/modals/add-item-modal"
 import { NewLocationModal } from "@/components/modals/new-location-modal"
 import { GroupItemsModal } from "@/components/modals/group-items-modal"
 import { HelpModal } from "@/components/modals/help-modal"
 import { ItemDetailsModal } from "@/components/modals/item-details-modal"
-import { PhotoViewModal } from "@/components/modals/photo-view-modal"
 import { DndProviderWrapper } from "@/components/dnd-provider"
 
 function InventoryApp() {
@@ -30,23 +32,77 @@ function InventoryApp() {
     editLocation,
     moveItems,
     moveItemBetweenContainers,
+    moveContainerBetweenContainers,
     toggleItemSelection,
     selectAllItems,
     deselectAllItems,
     setSearchQuery,
     findContainerById,
-    getFilteredItems
+    getFilteredItems,
+    undo,
+    canUndo
   } = useInventory()
+  
+  // Force DndKit to re-register after undo
+  const [dndKey, setDndKey] = useState(0)
+  
+  // Mobile state
+  const [isMobile, setIsMobile] = useState(false)
+  const [showAllItemsView, setShowAllItemsView] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
+  const handleUndo = () => {
+    undo()
+    // Force re-render of DndKit by updating key after state update
+    setTimeout(() => {
+      setDndKey(prev => prev + 1)
+    }, 100)
+  }
+
+  // Helper to get all container IDs for debugging
+  const getAllContainerIds = (containerList: Container[]): string[] => {
+    const ids: string[] = []
+    const traverse = (containers: Container[]) => {
+      containers.forEach(container => {
+        ids.push(container.id)
+        if (container.children && container.children.length > 0) {
+          traverse(container.children)
+        }
+      })
+    }
+    traverse(containerList)
+    return ids
+  }
 
   const handleDragEnd = (event: any) => {
     const { active, over } = event
 
-    if (!over) return
+    if (!over) {
+      return
+    }
 
     const activeData = active.data.current
     const overData = over.data.current
 
-    if (!activeData || !overData) return
+    console.log('Drag end event:', {
+      activeId: active.id,
+      overId: over.id,
+      activeData,
+      overData
+    })
+
+    if (!activeData || !overData) {
+      console.warn('Missing active or over data')
+      return
+    }
 
     // Handle item being dropped on container
     if (activeData.type === 'item' && overData.type === 'container') {
@@ -54,21 +110,71 @@ function InventoryApp() {
       const sourceContainerId = activeData.containerId as string
       const targetContainerId = over.id as string
 
-      if (sourceContainerId !== targetContainerId) {
+      if (sourceContainerId && targetContainerId && sourceContainerId !== targetContainerId) {
         moveItemBetweenContainers(itemId, sourceContainerId, targetContainerId)
       }
     }
 
     // Handle container being dropped on container (moving folders)
-    // Note: This would require a moveContainer function in the context
-    // For now, we'll just log it - you can implement this later
     if (activeData.type === 'container' && overData.type === 'container') {
       const containerId = active.id as string
       const targetContainerId = over.id as string
 
-      if (containerId !== targetContainerId) {
-        // TODO: Implement container moving logic
-        console.log(`Move container ${containerId} to ${targetContainerId}`)
+      console.log('Container drag detected:', { 
+        containerId, 
+        targetContainerId,
+        activeData: activeData.container,
+        overData: overData.containerId
+      })
+
+      if (containerId && targetContainerId && containerId !== targetContainerId) {
+        // Prevent moving a container into itself or its children
+        // Try to get container from activeData first, then fallback to lookup
+        const sourceContainer = activeData.container || findContainerById(containers, containerId)
+        
+        // For target, try to get from overData first, then lookup
+        const targetContainer = overData.container || findContainerById(containers, targetContainerId)
+        
+        console.log('Container lookup:', {
+          containerId,
+          targetContainerId,
+          sourceFound: !!sourceContainer,
+          targetFound: !!targetContainer,
+          sourceId: sourceContainer?.id,
+          targetId: targetContainer?.id,
+          sourceFromData: !!activeData.container,
+          targetFromData: !!overData.container,
+          containersLength: containers.length,
+          allContainerIds: getAllContainerIds(containers)
+        })
+        
+        if (sourceContainer && targetContainer) {
+          // Check if target is a child of source (would create circular reference)
+          const isChild = (parent: Container, childId: string): boolean => {
+            if (parent.children) {
+              for (const child of parent.children) {
+                if (child.id === childId) return true
+                if (child.children && isChild(child, childId)) return true
+              }
+            }
+            return false
+          }
+          
+          // Also check if trying to move to same parent (no-op)
+          if (sourceContainer.parentId === targetContainerId) {
+            return // Already in this parent, no need to move
+          }
+          
+          if (!isChild(sourceContainer, targetContainerId)) {
+            console.log('Moving container:', containerId, 'to parent:', targetContainerId)
+            moveContainerBetweenContainers(containerId, targetContainerId)
+          } else {
+            const { toast } = require('sonner')
+            toast.error("Cannot move folder into its own subfolder")
+          }
+        } else {
+          console.warn('Source or target container not found')
+        }
       }
     }
   }
@@ -78,7 +184,6 @@ function InventoryApp() {
   const [showGroupModal, setShowGroupModal] = useState(false)
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [showItemDetailsModal, setShowItemDetailsModal] = useState(false)
-  const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [activeItem, setActiveItem] = useState<Item | null>(null)
 
   const filteredItems = getFilteredItems()
@@ -99,70 +204,31 @@ function InventoryApp() {
   }
 
   return (
-    <DndProviderWrapper onDragEnd={handleDragEnd}>
+    <DndProviderWrapper key={dndKey} onDragEnd={handleDragEnd}>
       <div className="app-container">
-        <Header
-          searchQuery={searchQuery}
-          selectedItems={Array.from(selectedItems)}
-          onSearchChange={setSearchQuery}
-          onClearSelection={deselectAllItems}
-          onDelete={() => deleteItems(Array.from(selectedItems))}
-          onGroupIntoLocation={() => setShowGroupModal(true)}
-          onAddItem={() => setShowAddItemModal(true)}
-          onAddLocation={() => setShowAddLocationModal(true)}
-          onShowHelp={() => setShowHelpModal(true)}
-        />
+        {isMobile ? (
+          <>
+            <MobileHeader
+              searchQuery={searchQuery}
+              selectedItems={Array.from(selectedItems)}
+              onSearchChange={setSearchQuery}
+              onClearSelection={deselectAllItems}
+              onDelete={() => deleteItems(Array.from(selectedItems))}
+              onGroupIntoLocation={() => setShowGroupModal(true)}
+              onAddItem={() => setShowAddItemModal(true)}
+              onAddLocation={() => setShowAddLocationModal(true)}
+              onShowHelp={() => setShowHelpModal(true)}
+              onUndo={handleUndo}
+              canUndo={canUndo()}
+            />
 
-        <div className="main-content">
-          <div className="sidebar">
-          <FolderTree
-            containers={containers}
-            selectedContainer={selectedContainer}
-            expandedContainers={expandedContainers}
-            onContainerSelect={selectContainer}
-            onContainerToggle={toggleContainerExpansion}
-            onViewAllItems={() => selectContainer(null)}
-            onItemClick={(item) => {
-              setActiveItem(item)
-              setShowItemDetailsModal(true)
-            }}
-            onContainerEdit={editLocation}
-          />
-          </div>
-
-          <div className="content-area">
-            <div className="p-6">
-              <div className="mb-6">
-                <h2 className="text-2xl font-semibold mb-1">
-                  {selectedContainer ? (
-                    findContainerById(selectedContainer)?.containerName || 'Location'
-                  ) : filteredItems.length > 0 ? (
-                    `All Items (${filteredItems.length})`
-                  ) : (
-                    'Contents'
-                  )}
-                </h2>
-                {selectedContainer && (
-                  <p className="text-sm text-muted-foreground">
-                    {findContainerById(selectedContainer)?.containerLocation.path}
-                  </p>
-                )}
-              </div>
-
-              {filteredItems.length === 0 ? (
-                <div className="empty-state">
-                  <p className="text-muted-foreground mb-4">No items found</p>
-                  <button
-                    className="action-button mt-2"
-                    onClick={() => setShowAddItemModal(true)}
-                  >
-                    Add Item
-                  </button>
-                </div>
-              ) : (
-                <InventoryTable
+            <div className="mobile-main-content">
+              {showAllItemsView ? (
+                <MobileAllItemsView
                   items={filteredItems}
                   selectedItems={Array.from(selectedItems)}
+                  containers={containers}
+                  expandedContainers={expandedContainers}
                   containerId={selectedContainer || undefined}
                   onSelectItems={(items) => {
                     deselectAllItems()
@@ -174,13 +240,158 @@ function InventoryApp() {
                   }}
                   onViewPhoto={(item) => {
                     setActiveItem(item)
-                    setShowPhotoModal(true)
+                    setShowItemDetailsModal(true)
+                  }}
+                  onBack={() => setShowAllItemsView(false)}
+                  onMoveItem={(itemId, targetContainerId) => {
+                    // Find source container for the item
+                    const findItemContainer = (containers: Container[], itemId: string): Container | null => {
+                      for (const container of containers) {
+                        if (container.items?.some(item => item.id === itemId)) {
+                          return container
+                        }
+                        if (container.children) {
+                          const found = findItemContainer(container.children, itemId)
+                          if (found) return found
+                        }
+                      }
+                      return null
+                    }
+                    const sourceContainer = findItemContainer(containers, itemId)
+                    if (sourceContainer) {
+                      moveItemBetweenContainers(itemId, sourceContainer.id, targetContainerId)
+                    }
+                  }}
+                  onContainerToggle={toggleContainerExpansion}
+                />
+              ) : (
+                <MobileAccordionView
+                  containers={containers}
+                  selectedContainer={selectedContainer}
+                  expandedContainers={expandedContainers}
+                  onContainerSelect={selectContainer}
+                  onContainerToggle={toggleContainerExpansion}
+                  onViewAllItems={() => {
+                    selectContainer(null)
+                    setShowAllItemsView(true)
+                  }}
+                  onItemClick={(item) => {
+                    setActiveItem(item)
+                    setShowItemDetailsModal(true)
+                  }}
+                  onContainerEdit={editLocation}
+                  onMoveItem={(itemId, targetContainerId) => {
+                    // Find source container for the item
+                    const findItemContainer = (containers: Container[], itemId: string): Container | null => {
+                      for (const container of containers) {
+                        if (container.items?.some(item => item.id === itemId)) {
+                          return container
+                        }
+                        if (container.children) {
+                          const found = findItemContainer(container.children, itemId)
+                          if (found) return found
+                        }
+                      }
+                      return null
+                    }
+                    const sourceContainer = findItemContainer(containers, itemId)
+                    if (sourceContainer) {
+                      moveItemBetweenContainers(itemId, sourceContainer.id, targetContainerId)
+                    }
+                  }}
+                  onMoveContainer={(containerId, targetContainerId) => {
+                    moveContainerBetweenContainers(containerId, targetContainerId)
                   }}
                 />
               )}
             </div>
-          </div>
-        </div>
+          </>
+        ) : (
+          <>
+            <Header
+              searchQuery={searchQuery}
+              selectedItems={Array.from(selectedItems)}
+              onSearchChange={setSearchQuery}
+              onClearSelection={deselectAllItems}
+              onDelete={() => deleteItems(Array.from(selectedItems))}
+              onGroupIntoLocation={() => setShowGroupModal(true)}
+              onAddItem={() => setShowAddItemModal(true)}
+              onAddLocation={() => setShowAddLocationModal(true)}
+              onShowHelp={() => setShowHelpModal(true)}
+              onUndo={handleUndo}
+              canUndo={canUndo()}
+            />
+
+            <div className="main-content">
+              <div className="sidebar">
+                <FolderTree
+                  containers={containers}
+                  selectedContainer={selectedContainer}
+                  expandedContainers={expandedContainers}
+                  onContainerSelect={selectContainer}
+                  onContainerToggle={toggleContainerExpansion}
+                  onViewAllItems={() => selectContainer(null)}
+                  onItemClick={(item) => {
+                    setActiveItem(item)
+                    setShowItemDetailsModal(true)
+                  }}
+                  onContainerEdit={editLocation}
+                />
+              </div>
+
+              <div className="content-area">
+                <div className="p-6">
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-semibold mb-1">
+                      {selectedContainer ? (
+                        findContainerById(selectedContainer)?.containerName || 'Location'
+                      ) : filteredItems.length > 0 ? (
+                        `All Items (${filteredItems.length})`
+                      ) : (
+                        'Contents'
+                      )}
+                    </h2>
+                    {selectedContainer && (
+                      <p className="text-sm text-muted-foreground">
+                        {findContainerById(selectedContainer)?.containerLocation.path}
+                      </p>
+                    )}
+                  </div>
+
+                  {filteredItems.length === 0 ? (
+                    <div className="empty-state">
+                      <p className="text-muted-foreground mb-4">No items found</p>
+                      <button
+                        className="action-button mt-2"
+                        onClick={() => setShowAddItemModal(true)}
+                      >
+                        Add Item
+                      </button>
+                    </div>
+                  ) : (
+                    <InventoryTable
+                      items={filteredItems}
+                      selectedItems={Array.from(selectedItems)}
+                      containerId={selectedContainer || undefined}
+                      onSelectItems={(items) => {
+                        deselectAllItems()
+                        items.forEach(itemId => toggleItemSelection(itemId))
+                      }}
+                      onViewItem={(item) => {
+                        setActiveItem(item)
+                        setShowItemDetailsModal(true)
+                      }}
+                      onViewPhoto={(item) => {
+                        setActiveItem(item)
+                        setShowItemDetailsModal(true)
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
       <AddItemModal
         open={showAddItemModal}
@@ -219,16 +430,12 @@ function InventoryApp() {
 
       <ItemDetailsModal
         open={showItemDetailsModal}
-        onClose={() => setShowItemDetailsModal(false)}
+        onClose={() => {
+          setShowItemDetailsModal(false)
+        }}
         item={activeItem}
         onEdit={editItem}
         onAddItem={addItem}
-      />
-
-      <PhotoViewModal
-        open={showPhotoModal}
-        onClose={() => setShowPhotoModal(false)}
-        item={activeItem}
       />
       </div>
     </DndProviderWrapper>

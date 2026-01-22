@@ -30,8 +30,7 @@ export function DraggableItem({ item, containerId, children, asTableRow = false 
 
   const style = {
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
-    cursor: isDragging ? 'grabbing' : 'grab',
+    opacity: isDragging ? 0.3 : 1,
   }
 
   // For table rows, we need to clone the child and add draggable props
@@ -48,8 +47,82 @@ export function DraggableItem({ item, containerId, children, asTableRow = false 
         }
       },
       style: { ...style, ...childProps.style },
-      ...listeners,
       ...attributes,
+      className: `${childProps.className || ''} cursor-grab active:cursor-grabbing`,
+      onPointerDown: (e: React.PointerEvent) => {
+        // Stop propagation to prevent container drag
+        e.stopPropagation()
+        if (listeners?.onPointerDown) {
+          listeners.onPointerDown(e as any)
+        }
+        if (childProps.onPointerDown) {
+          childProps.onPointerDown(e)
+        }
+      },
+      onMouseDown: (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (childProps.onMouseDown) {
+          childProps.onMouseDown(e)
+        }
+      },
+      onTouchStart: (e: React.TouchEvent) => {
+        e.stopPropagation()
+        if (childProps.onTouchStart) {
+          childProps.onTouchStart(e)
+        }
+      },
+    })
+  }
+
+  // For non-table-row items, apply listeners directly to the child element
+  if (React.isValidElement(children)) {
+    const childProps = (children as React.ReactElement<any>).props || {}
+    return React.cloneElement(children as React.ReactElement<any>, {
+      ref: (node: HTMLElement | null) => {
+        setNodeRef(node)
+        if (typeof childProps.ref === 'function') {
+          childProps.ref(node)
+        } else if (childProps.ref) {
+          childProps.ref.current = node
+        }
+      },
+      style: { ...style, ...childProps.style },
+      ...attributes,
+      className: `${childProps.className || ''} cursor-grab active:cursor-grabbing`,
+      onPointerDown: (e: React.PointerEvent) => {
+        // Stop propagation to prevent container drag, but allow item drag
+        const target = e.target as HTMLElement
+        if (target.closest('button')) {
+          e.stopPropagation()
+          return
+        }
+        if (listeners?.onPointerDown) {
+          listeners.onPointerDown(e as any)
+        }
+        if (childProps.onPointerDown) {
+          childProps.onPointerDown(e)
+        }
+      },
+      onMouseDown: (e: React.MouseEvent) => {
+        const target = e.target as HTMLElement
+        if (target.closest('button')) {
+          e.stopPropagation()
+          return
+        }
+        if (childProps.onMouseDown) {
+          childProps.onMouseDown(e)
+        }
+      },
+      onTouchStart: (e: React.TouchEvent) => {
+        const target = e.target as HTMLElement
+        if (target.closest('button')) {
+          e.stopPropagation()
+          return
+        }
+        if (childProps.onTouchStart) {
+          childProps.onTouchStart(e)
+        }
+      },
     })
   }
 
@@ -57,10 +130,11 @@ export function DraggableItem({ item, containerId, children, asTableRow = false 
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
       {...attributes}
     >
-      {children}
+      <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none">
+        {children}
+      </div>
     </div>
   )
 }

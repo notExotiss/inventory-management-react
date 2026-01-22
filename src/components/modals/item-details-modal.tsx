@@ -23,6 +23,7 @@ import {
 import { Camera, Upload, X } from "lucide-react"
 import { Item } from "@/lib/types"
 import { toast } from "sonner"
+import { getPlaceholderImage } from "@/lib/utils"
 
 interface ItemDetailsModalProps {
   open: boolean
@@ -54,7 +55,12 @@ export function ItemDetailsModal({
 
   React.useEffect(() => {
     if (item) {
-      setEditedItem(item)
+      setEditedItem({
+        itemName: item.itemName,
+        itemLocation: item.itemLocation,
+        description: item.description,
+        itemMeasurements: item.itemMeasurements
+      })
       setImage(item.image || null)
       if (item.itemMeasurements) {
         setEditedMeasurements({
@@ -64,6 +70,7 @@ export function ItemDetailsModal({
       } else {
         setEditedMeasurements({ size: "", unit: "" })
       }
+      setIsEditing(false) // Reset editing state when item changes
     }
   }, [item])
 
@@ -80,17 +87,19 @@ export function ItemDetailsModal({
   const handleSave = () => {
     if (item && editedItem) {
       const updatedItem: Item = {
-        ...item,
-        ...editedItem,
         id: item.id, // Ensure ID is preserved
-        image: image || undefined,
+        itemName: editedItem.itemName || item.itemName,
+        itemLocation: item.itemLocation, // Keep original location unless explicitly changed
+        description: editedItem.description !== undefined ? editedItem.description : item.description,
+        image: image !== null ? image : (image === null && item.image ? undefined : item.image),
         itemMeasurements: editedMeasurements.size && editedMeasurements.unit ? {
           size: parseFloat(editedMeasurements.size) || 0,
           unit: editedMeasurements.unit
-        } : undefined
+        } : (editedMeasurements.size === "" && editedMeasurements.unit === "" ? undefined : item.itemMeasurements)
       }
       onEdit(updatedItem)
       setIsEditing(false)
+      onClose() // Close modal after saving
     }
   }
 
@@ -193,12 +202,17 @@ export function ItemDetailsModal({
     stopCamera()
   }
 
+  const handleImageError = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const imgElement = event.currentTarget
+    imgElement.src = getPlaceholderImage('item', item?.itemName || 'Item')
+  }
+
   if (!item) return null
 
   return (
     <>
       <Dialog open={open && !showCamera} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-300 bg-background shadow-2xl">
           <DialogHeader>
             <DialogTitle>
               {isEditing ? `Edit ${item.itemName}` : `${item.itemName} Details`}
@@ -269,13 +283,13 @@ export function ItemDetailsModal({
                   </Label>
                   <div className="col-span-3">
                     {image ? (
-                      <Card>
-                        <CardContent className="p-4">
+                      <Card className="bg-background border-border">
+                        <CardContent className="p-4 bg-background">
                           <div className="relative">
                             <img
                               src={image}
                               alt="Item preview"
-                              className="w-full max-h-48 object-contain rounded"
+                              className="w-full max-h-48 object-contain rounded bg-background"
                             />
                             <Button
                               type="button"
@@ -290,8 +304,8 @@ export function ItemDetailsModal({
                         </CardContent>
                       </Card>
                     ) : (
-                      <Card>
-                        <CardContent className="p-4">
+                      <Card className="bg-background border-border">
+                        <CardContent className="p-4 bg-background">
                           <div className="grid grid-cols-2 gap-3">
                             <Button
                               type="button"
@@ -300,7 +314,7 @@ export function ItemDetailsModal({
                                 setShowCamera(true)
                                 setTimeout(() => startCamera(), 300)
                               }}
-                              className="h-20 flex flex-col gap-2"
+                              className="h-20 flex flex-col gap-2 bg-background"
                             >
                               <Camera className="h-6 w-6" />
                               <span className="text-xs">Take Photo</span>
@@ -309,7 +323,7 @@ export function ItemDetailsModal({
                               type="button"
                               variant="outline"
                               onClick={() => fileInputRef.current?.click()}
-                              className="h-20 flex flex-col gap-2"
+                              className="h-20 flex flex-col gap-2 bg-background"
                             >
                               <Upload className="h-6 w-6" />
                               <span className="text-xs">Upload</span>
@@ -330,38 +344,37 @@ export function ItemDetailsModal({
               </>
             ) : (
               <div className="space-y-4">
-                {item.image && (
-                  <Card>
-                    <CardContent className="p-4">
-                      <img
-                        src={item.image}
-                        alt={item.itemName}
-                        className="w-full max-h-64 object-contain rounded"
-                      />
-                    </CardContent>
-                  </Card>
-                )}
+                <Card className="overflow-hidden animate-in fade-in zoom-in-95 duration-300 border-0 bg-background">
+                  <CardContent className="p-0 bg-background">
+                    <img
+                      src={item.image || getPlaceholderImage('item', item.itemName)}
+                      alt={item.itemName}
+                      className="w-full max-h-96 object-contain bg-background"
+                      onError={handleImageError}
+                    />
+                  </CardContent>
+                </Card>
 
-                <div className="grid gap-3">
-                  <div className="flex justify-between items-center py-2 border-b">
+                <div className="grid gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex justify-between items-center py-2 border-b border-border/50">
                     <span className="font-medium">Name:</span>
                     <span className="text-right">{item.itemName}</span>
                   </div>
 
-                  <div className="flex justify-between items-center py-2 border-b">
+                  <div className="flex justify-between items-center py-2 border-b border-border/50">
                     <span className="font-medium">Location:</span>
-                    <span className="text-right">{item.itemLocation.path}</span>
+                    <span className="text-right text-sm text-muted-foreground">{item.itemLocation.path}</span>
                   </div>
 
                   {item.itemMeasurements && (
-                    <div className="flex justify-between items-center py-2 border-b">
+                    <div className="flex justify-between items-center py-2 border-b border-border/50">
                       <span className="font-medium">Measurements:</span>
                       <span className="text-right">{item.itemMeasurements.size} {item.itemMeasurements.unit}</span>
                     </div>
                   )}
 
                   {item.description && (
-                    <div className="py-2 border-b">
+                    <div className="py-2 border-b border-border/50">
                       <span className="font-medium">Description:</span>
                       <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
                     </div>
@@ -403,7 +416,7 @@ export function ItemDetailsModal({
 
       {showCamera && (
         <Dialog open={showCamera} onOpenChange={handleCameraClose}>
-          <DialogContent className="sm:max-w-md modal-box bg-base-100">
+          <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6 modal-box bg-background">
             <DialogHeader>
               <DialogTitle>Take a Photo</DialogTitle>
               <DialogDescription>

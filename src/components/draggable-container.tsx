@@ -27,8 +27,7 @@ export function DraggableContainer({ container, children }: DraggableContainerPr
 
   const style = {
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
-    cursor: isDragging ? 'grabbing' : 'grab',
+    opacity: isDragging ? 0.4 : 1,
   }
 
   if (React.isValidElement(children)) {
@@ -44,8 +43,27 @@ export function DraggableContainer({ container, children }: DraggableContainerPr
         }
       },
       style: { ...style, ...childProps.style },
-      ...listeners,
       ...attributes,
+      className: `${childProps.className || ''} cursor-grab active:cursor-grabbing`,
+      onPointerDown: (e: React.PointerEvent) => {
+        // Only allow dragging from the folder header, not from items inside
+        const target = e.target as HTMLElement
+        const isItemRow = target.closest('.item-row')
+        const isDragHandleFalse = target.closest('[data-drag-handle="false"]')
+        const isFolderHeader = target.closest('.folder-header') || target.closest('[data-drag-handle="true"]')
+        
+        // Don't drag container if clicking on item or non-draggable area
+        if (isItemRow || isDragHandleFalse || !isFolderHeader) {
+          return
+        }
+        
+        if (listeners?.onPointerDown) {
+          listeners.onPointerDown(e as any)
+        }
+        if (childProps.onPointerDown) {
+          childProps.onPointerDown(e)
+        }
+      },
     })
   }
 

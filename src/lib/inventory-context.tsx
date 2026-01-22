@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { Container, Item } from './types'
 import { toast } from 'sonner'
 import { v4 as uuidv4 } from 'uuid'
@@ -213,9 +213,9 @@ function addItemToContainer(containers: Container[], containerId: string, item: 
 
 function updateItemInContainers(containers: Container[], updatedItem: Item): Container[] {
   return containers.map(container => {
-    if (container.items) {
+    if (container.items && container.items.some(item => item.id === updatedItem.id)) {
       const updatedItems = container.items.map(item =>
-        item.id === updatedItem.id ? updatedItem : item
+        item.id === updatedItem.id ? { ...updatedItem } : item
       )
       return { ...container, items: updatedItems }
     } else if (container.children && container.children.length > 0) {
@@ -270,49 +270,123 @@ function moveItemsBetweenContainers(
 ): Container[] {
   let itemsToMove: Item[] = []
 
+  // Helper function to recursively find and extract items
+  const extractItems = (containerList: Container[]): Container[] => {
+    return containerList.map(container => {
+      if (container.id === sourceContainerId) {
+        if (container.items && container.items.length > 0) {
+          itemsToMove = container.items.filter(item => itemIds.includes(item.id))
+          return {
+            ...container,
+            items: container.items.filter(item => !itemIds.includes(item.id))
+          }
+        }
+        return container
+      } else if (container.children && container.children.length > 0) {
+        return {
+          ...container,
+          children: extractItems(container.children)
+        }
+      }
+      return container
+    })
+  }
+
   // First pass: extract items from source container
-  const containersWithoutItems = containers.map(container => {
-    if (container.id === sourceContainerId && container.items) {
-      itemsToMove = container.items.filter(item => itemIds.includes(item.id))
-      return {
-        ...container,
-        items: container.items.filter(item => !itemIds.includes(item.id))
+  const containersWithoutItems = extractItems(containers)
+
+  // Helper function to recursively add items to target
+  const addItemsToTarget = (containerList: Container[]): Container[] => {
+    return containerList.map(container => {
+      if (container.id === targetContainerId) {
+        const targetContainer = findContainerById(containersWithoutItems, targetContainerId)
+        const updatedItems = itemsToMove.map(item => ({
+          ...item,
+          itemLocation: { path: targetContainer?.containerLocation.path || container.containerLocation.path }
+        }))
+
+        return {
+          ...container,
+          items: [...(container.items || []), ...updatedItems]
+        }
+      } else if (container.children && container.children.length > 0) {
+        return {
+          ...container,
+          children: addItemsToTarget(container.children)
+        }
       }
-    } else if (container.children && container.children.length > 0) {
-      return {
-        ...container,
-        children: moveItemsBetweenContainers(container.children, itemIds, sourceContainerId, targetContainerId)
-      }
-    }
-    return container
-  })
+      return container
+    })
+  }
 
   // Second pass: add items to target container
-  return containersWithoutItems.map(container => {
-    if (container.id === targetContainerId) {
-      const targetContainer = findContainerById(containersWithoutItems, targetContainerId)
-      const updatedItems = itemsToMove.map(item => ({
-        ...item,
-        itemLocation: { path: targetContainer?.containerLocation.path || '' }
-      }))
-
-      return {
-        ...container,
-        items: [...(container.items || []), ...updatedItems]
-      }
-    } else if (container.children && container.children.length > 0) {
-      return {
-        ...container,
-        children: moveItemsBetweenContainers(container.children, itemIds, sourceContainerId, targetContainerId)
-      }
-    }
-    return container
-  })
+  return addItemsToTarget(containersWithoutItems)
 }
 
-function moveContainer(containers: Container[], containerId: string, targetParentId?: string): Container[] {
-  // This is a simplified version - in a real app you'd want more sophisticated container moving logic
-  return containers
+function moveContainerHelper(
+  containers: Container[],
+  containerId: string,
+  targetParentId: string
+): Container[] {
+  let containerToMove: Container | null = null
+
+  // Helper to find and remove container from its current parent
+  const removeContainer = (containerList: Container[]): Container[] => {
+    return containerList
+      .map(container => {
+        if (container.id === containerId) {
+          containerToMove = { ...container }
+          return null // Mark for removal
+        }
+        if (container.children && container.children.length > 0) {
+          return {
+            ...container,
+            children: removeContainer(container.children).filter(Boolean) as Container[]
+          }
+        }
+        return container
+      })
+      .filter(Boolean) as Container[]
+  }
+
+  // First pass: remove container from its current location
+  const containersWithoutMoved = removeContainer(containers)
+
+  if (!containerToMove) {
+    return containers // Container not found
+  }
+
+  // Update container's parent and location
+  const targetContainer = findContainerById(containersWithoutMoved, targetParentId)
+  const updatedContainer: Container = {
+    ...containerToMove,
+    parentId: targetParentId,
+    containerLocation: {
+      path: targetContainer
+        ? `${targetContainer.containerLocation.path}/${containerToMove.containerName.replace(/\s/g, '_')}`
+        : containerToMove.containerLocation.path
+    }
+  }
+
+  // Second pass: add container to target parent
+  const addContainerToParent = (containerList: Container[]): Container[] => {
+    return containerList.map(container => {
+      if (container.id === targetParentId) {
+        return {
+          ...container,
+          children: [...(container.children || []), updatedContainer]
+        }
+      } else if (container.children && container.children.length > 0) {
+        return {
+          ...container,
+          children: addContainerToParent(container.children)
+        }
+      }
+      return container
+    })
+  }
+
+  return addContainerToParent(containersWithoutMoved)
 }
 
 interface InventoryContextType {
@@ -331,12 +405,16 @@ interface InventoryContextType {
   editLocation: (container: Container) => void
   moveItems: (itemIds: string[], targetContainerId: string) => void
   moveItemBetweenContainers: (itemId: string, sourceContainerId: string, targetContainerId: string) => void
+  moveContainerBetweenContainers: (containerId: string, targetParentId: string) => void
   toggleItemSelection: (itemId: string) => void
   selectAllItems: () => void
   deselectAllItems: () => void
   setSearchQuery: (query: string) => void
   findContainerById: (id: string) => Container | null
   getFilteredItems: () => Item[]
+  // Undo
+  undo: () => void
+  canUndo: () => boolean
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined)
@@ -347,6 +425,21 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(initialState.selectedItems)
   const [searchQuery, setSearchQueryState] = useState<string>(initialState.searchQuery)
   const [expandedContainers, setExpandedContainers] = useState<Set<string>>(initialState.expandedContainers)
+  
+  // Undo/Redo manager
+  const undoRedoManagerRef = useRef(new (require('./undo-redo').UndoRedoManager)())
+  
+  // Track if we're in an undo/redo operation to prevent saving state
+  const isUndoRedoRef = useRef(false)
+  
+  // Initialize with current state (only once on mount)
+  useEffect(() => {
+    const historyInfo = undoRedoManagerRef.current.getHistoryInfo()
+    if (historyInfo.length === 0) {
+      undoRedoManagerRef.current.saveState(containers, 'Initial state')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const selectContainer = useCallback((id: string | null) => {
     setSelectedContainer(id)
@@ -384,20 +477,41 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       itemMeasurements: item.itemMeasurements
     }
 
-    setContainers(prevContainers => addItemToContainer(prevContainers, targetContainerId, newItem))
+    setContainers(prevContainers => {
+      // Save state before change (unless we're in an undo/redo operation)
+      if (!isUndoRedoRef.current) {
+        undoRedoManagerRef.current.saveState(prevContainers, `Add item: ${newItem.itemName}`)
+      }
+      return addItemToContainer(prevContainers, targetContainerId, newItem)
+    })
     setSelectedItems(new Set())
     toast.success("Item added successfully")
-  }, [selectedContainer])
+  }, [selectedContainer, containers])
 
   const editItem = useCallback((updatedItem: Item) => {
-    setContainers(prevContainers => updateItemInContainers(prevContainers, updatedItem))
+    setContainers(prevContainers => {
+      // Save state before change (unless we're in an undo/redo operation)
+      if (!isUndoRedoRef.current) {
+        undoRedoManagerRef.current.saveState(prevContainers, `Edit item: ${updatedItem.itemName}`)
+      }
+      
+      const updated = updateItemInContainers(prevContainers, updatedItem)
+      // Return a new array to ensure React detects the change
+      return [...updated]
+    })
     toast.success("Item updated successfully")
   }, [])
 
   const deleteItems = useCallback((itemIds: string[]) => {
     if (itemIds.length === 0) return
 
-    setContainers(prevContainers => deleteItemsFromContainers(prevContainers, itemIds))
+    setContainers(prevContainers => {
+      // Save state before change (unless we're in an undo/redo operation)
+      if (!isUndoRedoRef.current) {
+        undoRedoManagerRef.current.saveState(prevContainers, `Delete ${itemIds.length} item${itemIds.length > 1 ? 's' : ''}`)
+      }
+      return deleteItemsFromContainers(prevContainers, itemIds)
+    })
     setSelectedItems(new Set())
     toast.success(`${itemIds.length} item${itemIds.length > 1 ? 's' : ''} deleted successfully`)
   }, [])
@@ -422,30 +536,113 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       image: location.image
     }
 
-    setContainers(prevContainers => parentId
-      ? addChildContainer(prevContainers, parentId, newLocation)
-      : [...prevContainers, newLocation]
-    )
+    setContainers(prevContainers => {
+      // Save state before change (unless we're in an undo/redo operation)
+      if (!isUndoRedoRef.current) {
+        undoRedoManagerRef.current.saveState(prevContainers, `Add location: ${newLocation.containerName}`)
+      }
+      return parentId
+        ? addChildContainer(prevContainers, parentId, newLocation)
+        : [...prevContainers, newLocation]
+    })
 
     toast.success("Location added successfully")
   }, [containers])
 
   const editLocation = useCallback((updatedContainer: Container) => {
-    setContainers(prevContainers => updateContainerInTree(prevContainers, updatedContainer))
+    setContainers(prevContainers => {
+      // Save state before change (unless we're in an undo/redo operation)
+      if (!isUndoRedoRef.current) {
+        undoRedoManagerRef.current.saveState(prevContainers, `Edit location: ${updatedContainer.containerName}`)
+      }
+      return updateContainerInTree(prevContainers, updatedContainer)
+    })
     toast.success("Location updated successfully")
   }, [])
 
   const moveItems = useCallback((itemIds: string[], targetContainerId: string) => {
     if (itemIds.length === 0) return
 
-    setContainers(prevContainers => moveItemsBetweenContainers(prevContainers, itemIds, selectedContainer!, targetContainerId))
+    setContainers(prevContainers => {
+      // Save state before change (unless we're in an undo/redo operation)
+      if (!isUndoRedoRef.current) {
+        undoRedoManagerRef.current.saveState(prevContainers, `Move ${itemIds.length} item${itemIds.length > 1 ? 's' : ''}`)
+      }
+      return moveItemsBetweenContainers(prevContainers, itemIds, selectedContainer!, targetContainerId)
+    })
     setSelectedItems(new Set())
     toast.success(`${itemIds.length} items moved successfully`)
   }, [selectedContainer])
 
   const moveItemBetweenContainers = useCallback((itemId: string, sourceContainerId: string, targetContainerId: string) => {
-    setContainers(prevContainers => moveItemsBetweenContainers(prevContainers, [itemId], sourceContainerId, targetContainerId))
+    console.log('moveItemBetweenContainers called:', { itemId, sourceContainerId, targetContainerId })
+    setContainers(prevContainers => {
+      // Verify containers exist
+      const sourceExists = findContainerById(prevContainers, sourceContainerId)
+      const targetExists = findContainerById(prevContainers, targetContainerId)
+      
+      if (!sourceExists) {
+        console.error('Source container not found:', sourceContainerId)
+        toast.error("Source folder not found")
+        return prevContainers
+      }
+      
+      if (!targetExists) {
+        console.error('Target container not found:', targetContainerId)
+        toast.error("Target folder not found")
+        return prevContainers
+      }
+      
+      // Save state before change (unless we're in an undo/redo operation)
+      if (!isUndoRedoRef.current) {
+        undoRedoManagerRef.current.saveState(prevContainers, 'Move item')
+      }
+      
+      const updated = moveItemsBetweenContainers(prevContainers, [itemId], sourceContainerId, targetContainerId)
+      console.log('Items moved, containers updated')
+      // Return a new array to ensure React detects the change
+      return [...updated]
+    })
     toast.success("Item moved successfully")
+  }, [])
+
+  const moveContainerBetweenContainers = useCallback((containerId: string, targetParentId: string) => {
+    console.log('moveContainerBetweenContainers called:', { containerId, targetParentId })
+    setContainers(prevContainers => {
+      // Check if container exists before trying to move
+      const containerExists = findContainerById(prevContainers, containerId)
+      const targetExists = findContainerById(prevContainers, targetParentId)
+      
+      console.log('Container existence check:', {
+        containerExists: !!containerExists,
+        targetExists: !!targetExists,
+        containerId,
+        targetParentId
+      })
+      
+      if (!containerExists) {
+        console.error('Container to move not found:', containerId)
+        toast.error("Source folder not found")
+        return prevContainers
+      }
+      
+      if (!targetExists) {
+        console.error('Target container not found:', targetParentId)
+        toast.error("Target folder not found")
+        return prevContainers
+      }
+      
+      // Save state before change (unless we're in an undo/redo operation)
+      if (!isUndoRedoRef.current) {
+        undoRedoManagerRef.current.saveState(prevContainers, 'Move folder')
+      }
+      
+      const updated = moveContainerHelper(prevContainers, containerId, targetParentId)
+      console.log('Containers updated, new length:', updated.length)
+      // Return a new array to ensure React detects the change
+      return [...updated]
+    })
+    toast.success("Folder moved successfully")
   }, [])
 
   const toggleItemSelection = useCallback((itemId: string) => {
@@ -479,6 +676,9 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   }, [containers])
 
   const getFilteredItems = useCallback((): Item[] => {
+    // Dynamic import to avoid circular dependencies
+    const { fuzzyMatch, getMatchScore } = require('./fuzzy-search')
+    
     if (!selectedContainer) {
       // Return all items from all containers
       const allItems: Item[] = []
@@ -493,7 +693,30 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         })
       }
       collectItems(containers)
-      return allItems
+      
+      if (!searchQuery.trim()) return allItems
+      
+      // Apply fuzzy search to all items
+      const filtered = allItems.filter(item =>
+        fuzzyMatch(searchQuery, item.itemName) ||
+        fuzzyMatch(searchQuery, item.description || '') ||
+        fuzzyMatch(searchQuery, item.itemLocation.path)
+      )
+      
+      // Sort by match score (best matches first)
+      return filtered.sort((a, b) => {
+        const scoreA = Math.max(
+          getMatchScore(searchQuery, a.itemName),
+          getMatchScore(searchQuery, a.description || ''),
+          getMatchScore(searchQuery, a.itemLocation.path)
+        )
+        const scoreB = Math.max(
+          getMatchScore(searchQuery, b.itemName),
+          getMatchScore(searchQuery, b.description || ''),
+          getMatchScore(searchQuery, b.itemLocation.path)
+        )
+        return scoreB - scoreA
+      })
     }
 
     const container = findContainerById(containers, selectedContainer)
@@ -501,13 +724,49 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 
     if (!searchQuery.trim()) return container.items
 
-    const lowerQuery = searchQuery.toLowerCase()
-    return container.items.filter(item =>
-      item.itemName.toLowerCase().includes(lowerQuery) ||
-      item.description?.toLowerCase().includes(lowerQuery) ||
-      item.itemLocation.path.toLowerCase().includes(lowerQuery)
+    // Apply fuzzy search
+    const filtered = container.items.filter(item =>
+      fuzzyMatch(searchQuery, item.itemName) ||
+      fuzzyMatch(searchQuery, item.description || '') ||
+      fuzzyMatch(searchQuery, item.itemLocation.path)
     )
+    
+    // Sort by match score (best matches first)
+    return filtered.sort((a, b) => {
+      const scoreA = Math.max(
+        getMatchScore(searchQuery, a.itemName),
+        getMatchScore(searchQuery, a.description || ''),
+        getMatchScore(searchQuery, a.itemLocation.path)
+      )
+      const scoreB = Math.max(
+        getMatchScore(searchQuery, b.itemName),
+        getMatchScore(searchQuery, b.description || ''),
+        getMatchScore(searchQuery, b.itemLocation.path)
+      )
+      return scoreB - scoreA
+    })
   }, [containers, selectedContainer, searchQuery])
+
+  // Undo function
+  const undo = useCallback(() => {
+    const state = undoRedoManagerRef.current.undo()
+    if (state) {
+      isUndoRedoRef.current = true
+      // Deep clone to ensure React detects the change and DndKit re-registers droppables
+      const clonedContainers = JSON.parse(JSON.stringify(state.containers))
+      // Use functional update to force React to see this as a change
+      setContainers(() => clonedContainers)
+      // Reset flag after state update
+      setTimeout(() => {
+        isUndoRedoRef.current = false
+      }, 100)
+      toast.success(`Undo: ${state.action}`)
+    }
+  }, [])
+
+  const canUndo = useCallback(() => {
+    return undoRedoManagerRef.current.canUndo()
+  }, [])
 
   const value: InventoryContextType = {
     containers,
@@ -524,12 +783,15 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     editLocation,
     moveItems,
     moveItemBetweenContainers,
+    moveContainerBetweenContainers,
     toggleItemSelection,
     selectAllItems,
     deselectAllItems,
     setSearchQuery,
     findContainerById: findContainerByIdHelper,
-    getFilteredItems
+    getFilteredItems,
+    undo,
+    canUndo
   }
 
   return (

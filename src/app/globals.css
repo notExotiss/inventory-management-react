@@ -25,25 +25,25 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 3%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 3%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 0 0% 10%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 50%;
   }
 }
 
@@ -55,6 +55,95 @@
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-family: "Inter", sans-serif;
+  }
+  
+  /* Ensure all components use proper theme colors */
+  .card, [class*="card"] {
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+  }
+  
+  .popover, [class*="popover"] {
+    background-color: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+  }
+  
+  input, textarea, select {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
+  }
+  
+  /* Ensure checkbox buttons have correct background and border */
+  button[aria-label*="Select"] {
+    background-color: white !important;
+    border-color: black !important;
+  }
+  
+  .dark button[aria-label*="Select"] {
+    background-color: black !important;
+    border-color: white !important;
+  }
+  
+  /* Override any hover effects that might change checkbox background */
+  button[aria-label*="Select"]:hover {
+    background-color: rgb(243 244 246) !important; /* gray-100 */
+    border-color: black !important;
+  }
+  
+  .dark button[aria-label*="Select"]:hover {
+    background-color: rgb(31 41 55) !important; /* gray-800 */
+    border-color: white !important;
+  }
+  
+  /* Ensure checkmark is black in light mode, white in dark mode */
+  button[aria-label*="Select"] svg {
+    color: black !important;
+  }
+  
+  .dark button[aria-label*="Select"] svg {
+    color: white !important;
+  }
+  
+  /* Fix transparency issues in light theme */
+  :root {
+    --card: 0 0% 100%;
+    --popover: 0 0% 100%;
+  }
+  
+  /* Ensure dialogs and modals are not transparent */
+  [role="dialog"], 
+  [data-radix-dialog-content],
+  [data-radix-dialog-overlay] {
+    background-color: hsl(var(--background)) !important;
+  }
+  
+  /* Fix all modal and dialog backgrounds */
+  .dialog-content,
+  [class*="dialog"],
+  [class*="modal"] {
+    background-color: hsl(var(--background)) !important;
+  }
+  
+  /* Ensure table backgrounds are solid */
+  table,
+  thead,
+  tbody,
+  tr,
+  td,
+  th {
+    background-color: transparent;
+  }
+  
+  /* Fix card backgrounds - use background instead of card in dark mode */
+  .dark .card,
+  .dark [class*="card"] {
+    background-color: hsl(var(--background)) !important;
+  }
+  
+  /* Ensure Card components use background in dark mode */
+  .dark .rounded-xl.border.bg-card {
+    background-color: hsl(var(--background)) !important;
   }
 }
 
@@ -75,8 +164,10 @@
   }
 
   .sidebar {
-    width: 300px;
-    background-color: hsl(var(--muted));
+    width: 320px;
+    min-width: 280px;
+    max-width: 400px;
+    background-color: hsl(var(--background));
     overflow-y: auto;
     border-right: 1px solid hsl(var(--border));
     padding: 0.75rem;
@@ -111,6 +202,130 @@
     overflow-y: auto;
     overflow-x: hidden;
     background-color: hsl(var(--background));
+  }
+
+  /* Mobile Layout */
+  .mobile-main-content {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+    background-color: hsl(var(--background));
+  }
+
+  .mobile-menu-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 39;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .dark .mobile-menu-overlay {
+    background-color: rgba(0, 0, 0, 0.7);
+  }
+
+  .mobile-container-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 85%;
+    max-width: 320px;
+    height: 100vh;
+    background-color: hsl(var(--background));
+    border-right: 1px solid hsl(var(--border));
+    z-index: 40;
+    overflow-y: auto;
+    padding: 1rem;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+    animation: slideInLeft 0.3s ease-out;
+  }
+
+  .dark .mobile-container-menu {
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.5);
+  }
+
+  @keyframes slideInLeft {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .mobile-content-area {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-color: hsl(var(--background));
+    width: 100%;
+  }
+
+  .mobile-container-accordion {
+    width: 100%;
+  }
+
+  .mobile-item-cards {
+    width: 100%;
+  }
+
+  /* Hide desktop layout on mobile */
+  @media (max-width: 767px) {
+    .main-content,
+    .sidebar,
+    .content-area {
+      display: none !important;
+    }
+  }
+
+  /* Hide mobile layout on desktop */
+  @media (min-width: 768px) {
+    .mobile-main-content,
+    .mobile-container-menu,
+    .mobile-content-area,
+    .mobile-menu-overlay {
+      display: none !important;
+    }
+  }
+
+  /* Mobile-specific touch optimizations */
+  @media (max-width: 767px) {
+    /* Remove hover effects on mobile, use active instead */
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Better modal sizing on mobile - keep rounded corners */
+    [role="dialog"] {
+      max-width: calc(100vw - 1.5rem) !important;
+      max-height: 85vh !important;
+      margin: 0.75rem !important;
+      border-radius: 0.5rem !important;
+    }
+
+    /* Make buttons more touch-friendly */
+    button, [role="button"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* Improve card touch targets */
+    .mobile-item-cards .card {
+      touch-action: manipulation;
+    }
   }
 
   .empty-state {
@@ -162,6 +377,9 @@
     margin-bottom: 2px;
     width: 100%;
     box-sizing: border-box;
+    background-color: transparent;
+    color: hsl(var(--foreground));
+    animation: fadeIn 0.2s ease-out;
   }
 
   .folder-header:hover {
@@ -175,9 +393,34 @@
     font-weight: 500;
   }
 
+  /* Light mode folder visibility */
+  :root .folder-header {
+    color: hsl(var(--foreground));
+  }
+
+  :root .folder-header:hover {
+    background-color: hsl(var(--muted));
+  }
+
   .dark .folder-header.selected {
     background-color: hsl(var(--primary) / 0.2);
     color: hsl(var(--primary));
+  }
+  
+  :root .folder-header.selected {
+    background-color: hsl(var(--primary) / 0.15);
+    color: hsl(var(--primary));
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .folder-name {
@@ -214,6 +457,8 @@
     margin: 0.25rem 0;
     border-radius: 6px;
     animation: fadeInUp 0.2s ease-out;
+    background-color: transparent;
+    color: hsl(var(--foreground));
   }
 
   .item-row:hover {
@@ -296,7 +541,7 @@
   }
 
   table tbody tr {
-    border-bottom: 1px solid hsl(var(--border) / 0.3);
+    border-bottom: 1px solid hsl(var(--border) / 0.2);
     transition: all 0.2s ease;
   }
 
@@ -309,7 +554,7 @@
   }
 
   table thead tr {
-    border-bottom: 1px solid hsl(var(--border));
+    border-bottom: 1px solid hsl(var(--border) / 0.3);
   }
 
   table thead th {
@@ -320,11 +565,98 @@
     color: hsl(var(--muted-foreground));
   }
 
+  /* Remove table border */
+  .content-area table {
+    border: none;
+  }
+
+  .content-area table tbody tr {
+    border-bottom: 1px solid hsl(var(--border) / 0.1);
+  }
+
   /* Smooth animations */
   * {
-    transition-property: color, background-color, border-color, transform, opacity;
+    transition-property: color, background-color, border-color, transform, opacity, width, height, margin, padding, box-shadow, filter;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 150ms;
+    transition-duration: 200ms;
+  }
+  
+  /* Enhanced animations */
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes scale-in {
+    from {
+      transform: scale(0.95);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+  
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+  }
+  
+  .animate-slide-in-left {
+    animation: slide-in-left 0.3s ease-out;
+  }
+  
+  .animate-scale-in {
+    animation: scale-in 0.2s ease-out;
+  }
+  
+  /* Hover effects */
+  .hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Button animations */
+  button {
+    transition: all 0.2s ease;
+  }
+  
+  button:hover {
+    transform: scale(1.02);
+  }
+  
+  button:active {
+    transform: scale(0.98);
   }
 
   /* Drag and drop visual feedback */
