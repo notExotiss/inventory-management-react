@@ -43,10 +43,8 @@ function InventoryApp() {
     canUndo
   } = useInventory()
   
-  // Force DndKit to re-register after undo
   const [dndKey, setDndKey] = useState(0)
   
-  // Mobile state
   const [isMobile, setIsMobile] = useState(false)
   const [showAllItemsView, setShowAllItemsView] = useState(false)
 
@@ -61,13 +59,11 @@ function InventoryApp() {
   
   const handleUndo = () => {
     undo()
-    // Force re-render of DndKit by updating key after state update
     setTimeout(() => {
       setDndKey(prev => prev + 1)
     }, 100)
   }
 
-  // Helper to get all container IDs for debugging
   const getAllContainerIds = (containerList: Container[]): string[] => {
     const ids: string[] = []
     const traverse = (containers: Container[]) => {
@@ -104,7 +100,6 @@ function InventoryApp() {
       return
     }
 
-    // Handle item being dropped on container
     if (activeData.type === 'item' && overData.type === 'container') {
       const itemId = active.id as string
       const sourceContainerId = activeData.containerId as string
@@ -115,7 +110,6 @@ function InventoryApp() {
       }
     }
 
-    // Handle container being dropped on container (moving folders)
     if (activeData.type === 'container' && overData.type === 'container') {
       const containerId = active.id as string
       const targetContainerId = over.id as string
@@ -128,12 +122,9 @@ function InventoryApp() {
       })
 
       if (containerId && targetContainerId && containerId !== targetContainerId) {
-        // Prevent moving a container into itself or its children
-        // Try to get container from activeData first, then fallback to lookup
-        const sourceContainer = activeData.container || findContainerById(containers, containerId)
+        const sourceContainer = activeData.container || findContainerById(containerId)
         
-        // For target, try to get from overData first, then lookup
-        const targetContainer = overData.container || findContainerById(containers, targetContainerId)
+        const targetContainer = overData.container || findContainerById(targetContainerId)
         
         console.log('Container lookup:', {
           containerId,
@@ -149,7 +140,6 @@ function InventoryApp() {
         })
         
         if (sourceContainer && targetContainer) {
-          // Check if target is a child of source (would create circular reference)
           const isChild = (parent: Container, childId: string): boolean => {
             if (parent.children) {
               for (const child of parent.children) {
@@ -160,9 +150,8 @@ function InventoryApp() {
             return false
           }
           
-          // Also check if trying to move to same parent (no-op)
           if (sourceContainer.parentId === targetContainerId) {
-            return // Already in this parent, no need to move
+            return
           }
           
           if (!isChild(sourceContainer, targetContainerId)) {
@@ -217,6 +206,10 @@ function InventoryApp() {
               onGroupIntoLocation={() => setShowGroupModal(true)}
               onAddItem={() => setShowAddItemModal(true)}
               onAddLocation={() => setShowAddLocationModal(true)}
+              onViewAllItems={() => {
+                selectContainer(null)
+                setShowAllItemsView(true)
+              }}
               onShowHelp={() => setShowHelpModal(true)}
               onUndo={handleUndo}
               canUndo={canUndo()}

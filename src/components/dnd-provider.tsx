@@ -27,7 +27,6 @@ export function DndProviderWrapper({ children, onDragEnd }: DndProviderWrapperPr
     setIsMounted(true)
   }, [])
 
-  // Use both PointerSensor (desktop) and TouchSensor (mobile)
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -64,7 +63,6 @@ export function DndProviderWrapper({ children, onDragEnd }: DndProviderWrapperPr
       return
     }
 
-    // Always call the parent handler - let it decide what to do
     onDragEnd?.(event)
   }
 
@@ -73,7 +71,6 @@ export function DndProviderWrapper({ children, onDragEnd }: DndProviderWrapperPr
     setActiveData(null)
   }
 
-  // Prevent hydration mismatch by only rendering DndContext on client
   if (!isMounted) {
     return <>{children}</>
   }

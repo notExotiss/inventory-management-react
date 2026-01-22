@@ -15,6 +15,7 @@ interface MobileHeaderProps {
   onGroupIntoLocation: () => void
   onAddItem: () => void
   onAddLocation: () => void
+  onViewAllItems: () => void
   onShowHelp: () => void
   onUndo: () => void
   canUndo: boolean
@@ -29,6 +30,7 @@ export function MobileHeader({
   onGroupIntoLocation,
   onAddItem,
   onAddLocation,
+  onViewAllItems,
   onShowHelp,
   onUndo,
   canUndo
@@ -109,24 +111,34 @@ export function MobileHeader({
           </Button>
         </div>
       ) : (
-        <div className="px-4 pb-3 flex items-center gap-2">
+        <div className="px-4 pb-3 flex flex-col gap-2 bg-background">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAddItem}
+              className="flex-1 flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Item</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAddLocation}
+              className="flex-1 flex items-center justify-center gap-2"
+            >
+              <FolderUp className="h-4 w-4" />
+              <span>Add Location</span>
+            </Button>
+          </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={onAddItem}
-            className="flex-1 flex items-center justify-center gap-2"
+            onClick={onViewAllItems}
+            className="w-full flex items-center justify-center gap-2"
           >
-            <Plus className="h-4 w-4" />
-            <span>Add Item</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onAddLocation}
-            className="flex-1 flex items-center justify-center gap-2"
-          >
-            <FolderUp className="h-4 w-4" />
-            <span>Add Location</span>
+            <span>View All Items</span>
           </Button>
         </div>
       )}

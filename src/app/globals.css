@@ -308,18 +308,17 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* Better modal sizing on mobile - keep rounded corners */
+    /* Better modal sizing on mobile - keep rounded corners and centered */
     [role="dialog"] {
-      max-width: calc(100vw - 1.5rem) !important;
-      max-height: 85vh !important;
-      margin: 0.75rem !important;
+      max-width: calc(100vw - 2rem) !important;
+      max-height: 80vh !important;
       border-radius: 0.5rem !important;
     }
 
-    /* Make buttons more touch-friendly */
-    button, [role="button"] {
-      min-height: 44px;
-      min-width: 44px;
+    /* Make buttons more touch-friendly - but not the small icon buttons */
+    button:not(.info-icon):not([class*="p-1"]), 
+    [role="button"]:not(.item-row) {
+      min-height: 40px;
     }
 
     /* Improve card touch targets */

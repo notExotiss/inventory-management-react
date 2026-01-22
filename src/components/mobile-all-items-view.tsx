@@ -85,7 +85,7 @@ export function MobileAllItemsView({
   if (items.length === 0) {
     return (
       <div className="mobile-all-items-view w-full h-full flex flex-col">
-        <div className="sticky top-0 z-10 bg-background border-b border-border p-4 flex items-center gap-3">
+        <div className="sticky top-0 z-10 border-b border-border p-4 flex items-center gap-3" style={{ backgroundColor: 'hsl(var(--background))' }}>
           <Button
             variant="ghost"
             size="sm"
@@ -105,7 +105,7 @@ export function MobileAllItemsView({
 
   return (
     <div className="mobile-all-items-view w-full h-full flex flex-col overflow-y-auto">
-      <div className="sticky top-0 z-10 bg-background border-b border-border p-4 flex items-center gap-3">
+      <div className="sticky top-0 z-10 border-b border-border p-4 flex items-center gap-3" style={{ backgroundColor: 'hsl(var(--background))' }}>
         <Button
           variant="ghost"
           size="sm"
@@ -151,16 +151,21 @@ export function MobileAllItemsView({
             >
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  {/* Checkbox - smaller and centered */}
+                  {/* Checkbox - square, not affected by min-height */}
                   <button
                     className={cn(
-                      "flex h-4 w-4 items-center justify-center rounded-sm border shadow-sm transition-colors flex-shrink-0 self-center",
+                      "flex items-center justify-center rounded-sm border shadow-sm transition-colors flex-shrink-0 self-center",
                       "border-black dark:border-white",
-                      "active:scale-95"
+                      "active:scale-95",
+                      "!min-h-0 !min-w-0 !h-5 !w-5"
                     )}
                     style={{
                       backgroundColor: 'white',
                       borderColor: 'black',
+                      height: '20px',
+                      width: '20px',
+                      minHeight: '20px',
+                      minWidth: '20px',
                     }}
                     onClick={(e) => handleSelectItem(item.id, e)}
                     aria-label={`Select ${item.itemName}`}

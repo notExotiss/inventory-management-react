@@ -23,7 +23,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
         <DialogHeader>
           <DialogTitle>Help & Instructions</DialogTitle>
           <DialogDescription>
-            Learn how to use the Team 2554 Inventory Management System
+            A guide for how to use the Inventory Management System
           </DialogDescription>
         </DialogHeader>
 

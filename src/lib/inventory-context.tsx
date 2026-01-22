@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { Container, Item } from './types'
 import { toast } from 'sonner'
 import { v4 as uuidv4 } from 'uuid'
+import { saveContainers, subscribeToContainers, initializeDefaultData } from './firestore-service'
 
 interface InventoryState {
   containers: Container[]
@@ -153,7 +154,6 @@ const initialState: InventoryState = {
   expandedContainers: new Set(['trailers', 'rooms', 'av-room', 'mays-room', 'kearnys-room', 'kearnys-desk', 'back-corner-shelf', 'big-cabinet', 'box-1', 'box-2', 'box-3', 'small-cabinet'])
 }
 
-// Helper functions
 function findContainerById(containers: Container[], id: string): Container | null {
   for (const container of containers) {
     if (container.id === id) {
@@ -270,7 +270,6 @@ function moveItemsBetweenContainers(
 ): Container[] {
   let itemsToMove: Item[] = []
 
-  // Helper function to recursively find and extract items
   const extractItems = (containerList: Container[]): Container[] => {
     return containerList.map(container => {
       if (container.id === sourceContainerId) {
@@ -292,10 +291,8 @@ function moveItemsBetweenContainers(
     })
   }
 
-  // First pass: extract items from source container
   const containersWithoutItems = extractItems(containers)
 
-  // Helper function to recursively add items to target
   const addItemsToTarget = (containerList: Container[]): Container[] => {
     return containerList.map(container => {
       if (container.id === targetContainerId) {
@@ -319,7 +316,6 @@ function moveItemsBetweenContainers(
     })
   }
 
-  // Second pass: add items to target container
   return addItemsToTarget(containersWithoutItems)
 }
 
@@ -330,13 +326,12 @@ function moveContainerHelper(
 ): Container[] {
   let containerToMove: Container | null = null
 
-  // Helper to find and remove container from its current parent
   const removeContainer = (containerList: Container[]): Container[] => {
     return containerList
       .map(container => {
         if (container.id === containerId) {
           containerToMove = { ...container }
-          return null // Mark for removal
+          return null
         }
         if (container.children && container.children.length > 0) {
           return {
@@ -349,26 +344,24 @@ function moveContainerHelper(
       .filter(Boolean) as Container[]
   }
 
-  // First pass: remove container from its current location
   const containersWithoutMoved = removeContainer(containers)
 
   if (!containerToMove) {
-    return containers // Container not found
+    return containers
   }
 
-  // Update container's parent and location
+  const movedContainer = containerToMove as Container
   const targetContainer = findContainerById(containersWithoutMoved, targetParentId)
   const updatedContainer: Container = {
-    ...containerToMove,
+    ...movedContainer,
     parentId: targetParentId,
     containerLocation: {
       path: targetContainer
-        ? `${targetContainer.containerLocation.path}/${containerToMove.containerName.replace(/\s/g, '_')}`
-        : containerToMove.containerLocation.path
+        ? `${targetContainer.containerLocation.path}/${movedContainer.containerName.replaceAll(/\\s/g, '_')}`
+        : movedContainer.containerLocation.path
     }
   }
 
-  // Second pass: add container to target parent
   const addContainerToParent = (containerList: Container[]): Container[] => {
     return containerList.map(container => {
       if (container.id === targetParentId) {
@@ -395,7 +388,7 @@ interface InventoryContextType {
   selectedItems: Set<string>
   searchQuery: string
   expandedContainers: Set<string>
-  // Actions
+
   selectContainer: (id: string | null) => void
   toggleContainerExpansion: (id: string) => void
   addItem: (item: Partial<Item>, containerId?: string) => void
@@ -412,7 +405,7 @@ interface InventoryContextType {
   setSearchQuery: (query: string) => void
   findContainerById: (id: string) => Container | null
   getFilteredItems: () => Item[]
-  // Undo
+
   undo: () => void
   canUndo: () => boolean
 }
@@ -425,21 +418,65 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(initialState.selectedItems)
   const [searchQuery, setSearchQueryState] = useState<string>(initialState.searchQuery)
   const [expandedContainers, setExpandedContainers] = useState<Set<string>>(initialState.expandedContainers)
+  const [isLoading, setIsLoading] = useState(true)
+  const [firestoreError, setFirestoreError] = useState<string | null>(null)
   
-  // Undo/Redo manager
   const undoRedoManagerRef = useRef(new (require('./undo-redo').UndoRedoManager)())
-  
-  // Track if we're in an undo/redo operation to prevent saving state
   const isUndoRedoRef = useRef(false)
+  const isInitialLoadRef = useRef(true)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
-  // Initialize with current state (only once on mount)
   useEffect(() => {
-    const historyInfo = undoRedoManagerRef.current.getHistoryInfo()
-    if (historyInfo.length === 0) {
-      undoRedoManagerRef.current.saveState(containers, 'Initial state')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const unsubscribe = subscribeToContainers(
+      (firestoreContainers) => {
+        if (firestoreContainers.length > 0) {
+          setContainers(firestoreContainers)
+          if (isInitialLoadRef.current) {
+            undoRedoManagerRef.current.saveState(firestoreContainers, 'Initial state')
+            isInitialLoadRef.current = false
+          }
+        } else if (isInitialLoadRef.current) {
+          initializeDefaultData(mockContainers).then(() => {
+            console.log("Initialized Firestore with default data")
+          }).catch((err) => {
+            console.error("Failed to initialize default data:", err)
+            setFirestoreError("Failed to initialize data")
+          })
+          isInitialLoadRef.current = false
+        }
+        setIsLoading(false)
+        setFirestoreError(null)
+      },
+      (error) => {
+        console.error("Firestore subscription error:", error)
+        setFirestoreError(error.message)
+        setIsLoading(false)
+      }
+    )
+
+    return () => unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (isLoading || isInitialLoadRef.current) return
+    
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+    
+    saveTimeoutRef.current = setTimeout(() => {
+      saveContainers(containers).catch((err) => {
+        console.error("Failed to save to Firestore:", err)
+        toast.error("Failed to save changes")
+      })
+    }, 500)
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [containers, isLoading])
 
   const selectContainer = useCallback((id: string | null) => {
     setSelectedContainer(id)
@@ -478,7 +515,6 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     }
 
     setContainers(prevContainers => {
-      // Save state before change (unless we're in an undo/redo operation)
       if (!isUndoRedoRef.current) {
         undoRedoManagerRef.current.saveState(prevContainers, `Add item: ${newItem.itemName}`)
       }
@@ -490,13 +526,11 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 
   const editItem = useCallback((updatedItem: Item) => {
     setContainers(prevContainers => {
-      // Save state before change (unless we're in an undo/redo operation)
       if (!isUndoRedoRef.current) {
         undoRedoManagerRef.current.saveState(prevContainers, `Edit item: ${updatedItem.itemName}`)
       }
       
       const updated = updateItemInContainers(prevContainers, updatedItem)
-      // Return a new array to ensure React detects the change
       return [...updated]
     })
     toast.success("Item updated successfully")
@@ -506,7 +540,6 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     if (itemIds.length === 0) return
 
     setContainers(prevContainers => {
-      // Save state before change (unless we're in an undo/redo operation)
       if (!isUndoRedoRef.current) {
         undoRedoManagerRef.current.saveState(prevContainers, `Delete ${itemIds.length} item${itemIds.length > 1 ? 's' : ''}`)
       }
@@ -537,7 +570,6 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     }
 
     setContainers(prevContainers => {
-      // Save state before change (unless we're in an undo/redo operation)
       if (!isUndoRedoRef.current) {
         undoRedoManagerRef.current.saveState(prevContainers, `Add location: ${newLocation.containerName}`)
       }
@@ -551,7 +583,6 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 
   const editLocation = useCallback((updatedContainer: Container) => {
     setContainers(prevContainers => {
-      // Save state before change (unless we're in an undo/redo operation)
       if (!isUndoRedoRef.current) {
         undoRedoManagerRef.current.saveState(prevContainers, `Edit location: ${updatedContainer.containerName}`)
       }
@@ -564,7 +595,6 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     if (itemIds.length === 0) return
 
     setContainers(prevContainers => {
-      // Save state before change (unless we're in an undo/redo operation)
       if (!isUndoRedoRef.current) {
         undoRedoManagerRef.current.saveState(prevContainers, `Move ${itemIds.length} item${itemIds.length > 1 ? 's' : ''}`)
       }
@@ -577,7 +607,6 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const moveItemBetweenContainers = useCallback((itemId: string, sourceContainerId: string, targetContainerId: string) => {
     console.log('moveItemBetweenContainers called:', { itemId, sourceContainerId, targetContainerId })
     setContainers(prevContainers => {
-      // Verify containers exist
       const sourceExists = findContainerById(prevContainers, sourceContainerId)
       const targetExists = findContainerById(prevContainers, targetContainerId)
       
@@ -593,14 +622,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         return prevContainers
       }
       
-      // Save state before change (unless we're in an undo/redo operation)
       if (!isUndoRedoRef.current) {
         undoRedoManagerRef.current.saveState(prevContainers, 'Move item')
       }
       
       const updated = moveItemsBetweenContainers(prevContainers, [itemId], sourceContainerId, targetContainerId)
       console.log('Items moved, containers updated')
-      // Return a new array to ensure React detects the change
       return [...updated]
     })
     toast.success("Item moved successfully")
@@ -609,7 +636,6 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const moveContainerBetweenContainers = useCallback((containerId: string, targetParentId: string) => {
     console.log('moveContainerBetweenContainers called:', { containerId, targetParentId })
     setContainers(prevContainers => {
-      // Check if container exists before trying to move
       const containerExists = findContainerById(prevContainers, containerId)
       const targetExists = findContainerById(prevContainers, targetParentId)
       
@@ -632,14 +658,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         return prevContainers
       }
       
-      // Save state before change (unless we're in an undo/redo operation)
       if (!isUndoRedoRef.current) {
         undoRedoManagerRef.current.saveState(prevContainers, 'Move folder')
       }
       
       const updated = moveContainerHelper(prevContainers, containerId, targetParentId)
       console.log('Containers updated, new length:', updated.length)
-      // Return a new array to ensure React detects the change
       return [...updated]
     })
     toast.success("Folder moved successfully")
@@ -676,11 +700,9 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   }, [containers])
 
   const getFilteredItems = useCallback((): Item[] => {
-    // Dynamic import to avoid circular dependencies
     const { fuzzyMatch, getMatchScore } = require('./fuzzy-search')
     
     if (!selectedContainer) {
-      // Return all items from all containers
       const allItems: Item[] = []
       const collectItems = (containers: Container[]) => {
         containers.forEach(container => {
@@ -696,14 +718,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       
       if (!searchQuery.trim()) return allItems
       
-      // Apply fuzzy search to all items
       const filtered = allItems.filter(item =>
         fuzzyMatch(searchQuery, item.itemName) ||
         fuzzyMatch(searchQuery, item.description || '') ||
         fuzzyMatch(searchQuery, item.itemLocation.path)
       )
       
-      // Sort by match score (best matches first)
       return filtered.sort((a, b) => {
         const scoreA = Math.max(
           getMatchScore(searchQuery, a.itemName),
@@ -724,14 +744,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 
     if (!searchQuery.trim()) return container.items
 
-    // Apply fuzzy search
     const filtered = container.items.filter(item =>
       fuzzyMatch(searchQuery, item.itemName) ||
       fuzzyMatch(searchQuery, item.description || '') ||
       fuzzyMatch(searchQuery, item.itemLocation.path)
     )
     
-    // Sort by match score (best matches first)
     return filtered.sort((a, b) => {
       const scoreA = Math.max(
         getMatchScore(searchQuery, a.itemName),
@@ -747,16 +765,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     })
   }, [containers, selectedContainer, searchQuery])
 
-  // Undo function
   const undo = useCallback(() => {
     const state = undoRedoManagerRef.current.undo()
     if (state) {
       isUndoRedoRef.current = true
-      // Deep clone to ensure React detects the change and DndKit re-registers droppables
       const clonedContainers = JSON.parse(JSON.stringify(state.containers))
-      // Use functional update to force React to see this as a change
       setContainers(() => clonedContainers)
-      // Reset flag after state update
       setTimeout(() => {
         isUndoRedoRef.current = false
       }, 100)

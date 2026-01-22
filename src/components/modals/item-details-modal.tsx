@@ -70,7 +70,7 @@ export function ItemDetailsModal({
       } else {
         setEditedMeasurements({ size: "", unit: "" })
       }
-      setIsEditing(false) // Reset editing state when item changes
+      setIsEditing(false)
     }
   }, [item])
 
@@ -87,9 +87,9 @@ export function ItemDetailsModal({
   const handleSave = () => {
     if (item && editedItem) {
       const updatedItem: Item = {
-        id: item.id, // Ensure ID is preserved
+        id: item.id,
         itemName: editedItem.itemName || item.itemName,
-        itemLocation: item.itemLocation, // Keep original location unless explicitly changed
+        itemLocation: item.itemLocation,
         description: editedItem.description !== undefined ? editedItem.description : item.description,
         image: image !== null ? image : (image === null && item.image ? undefined : item.image),
         itemMeasurements: editedMeasurements.size && editedMeasurements.unit ? {
@@ -99,7 +99,7 @@ export function ItemDetailsModal({
       }
       onEdit(updatedItem)
       setIsEditing(false)
-      onClose() // Close modal after saving
+      onClose()
     }
   }
 
@@ -212,7 +212,7 @@ export function ItemDetailsModal({
   return (
     <>
       <Dialog open={open && !showCamera} onOpenChange={onClose}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-300 bg-background shadow-2xl">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-300 bg-background shadow-2xl">
           <DialogHeader>
             <DialogTitle>
               {isEditing ? `Edit ${item.itemName}` : `${item.itemName} Details`}
@@ -349,21 +349,28 @@ export function ItemDetailsModal({
                     <img
                       src={item.image || getPlaceholderImage('item', item.itemName)}
                       alt={item.itemName}
-                      className="w-full max-h-96 object-contain bg-background"
+                      className="w-full max-h-48 sm:max-h-64 object-contain bg-background"
                       onError={handleImageError}
                     />
                   </CardContent>
                 </Card>
 
                 <div className="grid gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex justify-between items-center py-2 border-b border-border/50">
+                  <div className="flex flex-col py-2 border-b border-border/50 gap-1">
                     <span className="font-medium">Name:</span>
-                    <span className="text-right">{item.itemName}</span>
+                    <span style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{item.itemName}</span>
                   </div>
 
-                  <div className="flex justify-between items-center py-2 border-b border-border/50">
+                  <div className="flex flex-col py-2 border-b border-border/50 gap-1">
                     <span className="font-medium">Location:</span>
-                    <span className="text-right text-sm text-muted-foreground">{item.itemLocation.path}</span>
+                    <span className="text-sm text-muted-foreground" style={{ overflowWrap: 'break-word', wordBreak: 'break-all' }}>
+                      {item.itemLocation.path.split('/').filter(Boolean).map((segment, index, arr) => (
+                        <span key={index}>
+                          /{segment}
+                          {index < arr.length - 1 && <wbr />}
+                        </span>
+                      ))}
+                    </span>
                   </div>
 
                   {item.itemMeasurements && (
@@ -416,7 +423,7 @@ export function ItemDetailsModal({
 
       {showCamera && (
         <Dialog open={showCamera} onOpenChange={handleCameraClose}>
-          <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6 modal-box bg-background">
+          <DialogContent className="w-[calc(100vw-2rem)] max-w-md max-h-[85vh] overflow-y-auto p-4 sm:p-6 modal-box bg-background">
             <DialogHeader>
               <DialogTitle>Take a Photo</DialogTitle>
               <DialogDescription>

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Info, Move, ChevronDown } from "lucide-react"
+import { ChevronRight, ChevronDown, Info, Move } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Container, Item } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -12,7 +12,6 @@ import { DraggableContainer } from "./draggable-container"
 import { DroppableContainer } from "./droppable-container"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { FolderTree } from "./folder-tree"
-import * as AccordionPrimitive from "@radix-ui/react-accordion"
 
 interface MobileAccordionViewProps {
   containers: Container[]
@@ -43,6 +42,10 @@ export function MobileAccordionView({
   const [showMoveModal, setShowMoveModal] = React.useState(false)
   const [selectedContainerForModal, setSelectedContainerForModal] = React.useState<Container | null>(null)
   const [moveTarget, setMoveTarget] = React.useState<{ type: 'item' | 'container', id: string, name: string } | null>(null)
+
+  const isContainerExpanded = (containerId: string) => {
+    return expandedContainers.has(containerId)
+  }
 
   const handleContainerInfo = (container: Container, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -77,230 +80,192 @@ export function MobileAccordionView({
     setMoveTarget(null)
   }
 
-  // Alternating nesting background colors - solid, no transparency
-  const getNestingStyle = (level: number, isSelected: boolean) => {
-    if (isSelected) {
-      return "bg-primary/15 dark:bg-primary/20"
-    }
-    // Alternate between two shades for visual hierarchy
-    if (level % 2 === 0) {
-      return "bg-background"
-    } else {
-      return "bg-muted"
-    }
+  // Get folder icon based on level (matching desktop FolderTree)
+  const getFolderIcon = (level: number): string => {
+    const isOddLevel = level % 2 !== 0
+    return isOddLevel ? "material-symbols:folder-outline-rounded" : "material-symbols:folder-rounded"
   }
 
   const renderContainer = (container: Container, level = 0): React.ReactNode => {
+    const isExpanded = isContainerExpanded(container.id)
     const isSelected = selectedContainer === container.id
-    const isExpanded = expandedContainers.has(container.id)
     const hasChildren = container.children && container.children.length > 0
     const hasItems = container.items && container.items.length > 0
-    const folderIcon = level % 2 !== 0 
-      ? "material-symbols:folder-outline-rounded" 
-      : "material-symbols:folder-rounded"
-    
-    const nestingBg = getNestingStyle(level, isSelected)
+    const isCollapsible = hasChildren || hasItems
+    const folderIcon = getFolderIcon(level)
 
     return (
-      <DraggableContainer key={container.id} container={container}>
+      <div key={`${container.id}-${container.containerName}`} className="container-wrapper">
         <DroppableContainer
           key={`droppable-${container.id}-${container.items?.length || 0}-${container.children?.length || 0}`}
           containerId={container.id}
           container={container}
         >
-          <AccordionPrimitive.Item
-            value={container.id}
-            className={cn(
-              "border-b border-border",
-              nestingBg
-            )}
-          >
-            {/* Custom header that doesn't use AccordionTrigger (which is a button) */}
-            <div className="flex items-center w-full">
-              {/* Main clickable area for expanding/collapsing - NOT a button */}
+          <DraggableContainer container={container}>
+            <div 
+              className={cn(
+                "folder-item relative",
+                isSelected && "folder-selected"
+              )} 
+              data-container-id={container.id}
+            >
+              {/* Folder Header - MUST have folder-header class for DnD to work */}
               <div
                 className={cn(
-                  "flex-1 flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors",
-                  "hover:bg-muted/50 active:bg-muted",
-                  isSelected && "bg-primary/10 dark:bg-primary/15"
+                  "folder-header flex items-center py-2 px-3 cursor-pointer rounded-md transition-all duration-200",
+                  isSelected && "selected bg-primary/15 dark:bg-primary/20"
                 )}
-                style={{ paddingLeft: `${level * 12 + 12}px` }}
-                onClick={() => {
-                  onContainerSelect(container.id)
-                  onContainerToggle(container.id)
-                }}
+                style={{ paddingLeft: `${level * 16 + 12}px` }}
+                onClick={() => onContainerSelect(container.id)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    onContainerSelect(container.id)
-                    onContainerToggle(container.id)
-                  }
-                }}
+                onKeyDown={(e) => e.key === 'Enter' && onContainerSelect(container.id)}
                 data-drag-handle="true"
               >
+                {/* Expand/Collapse Button */}
+                {isCollapsible ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="p-0 h-auto mr-1 min-h-0 min-w-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onContainerToggle(container.id)
+                    }}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 transition-transform duration-200" />
+                    )}
+                  </Button>
+                ) : (
+                  <div className="w-5 mr-1" />
+                )}
+
+                {/* Folder Icon */}
                 <Icon
                   icon={folderIcon}
                   className={cn(
-                    "h-5 w-5 flex-shrink-0 transition-colors",
-                    isSelected ? "text-primary" : "text-muted-foreground"
+                    "h-5 w-5 mr-2 transition-colors flex-shrink-0",
+                    isSelected ? "text-primary" : "text-foreground"
                   )}
                 />
+                
+                {/* Folder Name */}
                 <span className={cn(
-                  "flex-1 text-left font-medium truncate text-sm",
+                  "folder-name flex-1 truncate text-sm font-medium",
                   isSelected ? "text-primary" : "text-foreground"
                 )}>
                   {container.containerName}
                 </span>
-                <ChevronDown 
-                  className={cn(
-                    "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                    isExpanded && "rotate-180"
-                  )} 
-                />
-              </div>
-              
-              {/* Action buttons - OUTSIDE the clickable area */}
-              <div className="flex items-center gap-1 pr-2 flex-shrink-0">
-                <button
-                  type="button"
-                  className="p-1.5 rounded-md hover:bg-muted active:bg-muted/80 transition-colors"
-                  onClick={(e) => handleContainerInfo(container, e)}
-                  aria-label={`View info for ${container.containerName}`}
-                >
-                  <Info className="h-4 w-4 text-muted-foreground" />
-                </button>
-                <button
-                  type="button"
-                  className="p-1.5 rounded-md hover:bg-muted active:bg-muted/80 transition-colors"
-                  onClick={(e) => handleMoveClick('container', container.id, container.containerName, e)}
-                  aria-label={`Move ${container.containerName}`}
-                >
-                  <Move className="h-4 w-4 text-muted-foreground" />
-                </button>
-              </div>
-            </div>
 
-            {/* Content that expands/collapses */}
-            <AccordionPrimitive.Content className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
-              <div className="pb-1">
-                {hasChildren && container.children && (
-                  <AccordionPrimitive.Root 
-                    type="multiple" 
-                    className="w-full"
-                    value={Array.from(expandedContainers)}
+                {/* Action Buttons */}
+                <div className="flex items-center gap-0.5 ml-auto">
+                  <button
+                    type="button"
+                    className="info-icon p-1.5 rounded-full hover:bg-muted active:bg-muted/80 transition-colors"
+                    onClick={(e) => handleContainerInfo(container, e)}
+                    aria-label={`View info for ${container.containerName}`}
                   >
-                    {container.children.map(childContainer => renderContainer(childContainer, level + 1))}
-                  </AccordionPrimitive.Root>
-                )}
-                {hasItems && container.items && (
-                  <DroppableContainer 
-                    key={`items-droppable-${container.id}-${container.items.length}`}
-                    containerId={container.id}
+                    <Info className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                  </button>
+                  <button
+                    type="button"
+                    className="p-1.5 rounded-full hover:bg-muted active:bg-muted/80 transition-colors"
+                    onClick={(e) => handleMoveClick('container', container.id, container.containerName, e)}
+                    aria-label={`Move ${container.containerName}`}
                   >
-                    <div 
-                      className="space-y-1 py-2 px-3"
-                      style={{ paddingLeft: `${(level + 1) * 12 + 12}px` }}
-                    >
-                      {container.items.map(item => (
-                        <DraggableItem
-                          key={item.id}
-                          item={item}
-                          containerId={container.id}
-                        >
-                          <div
-                            className={cn(
-                              "item-row flex items-center gap-2 py-2 px-3 rounded-md",
-                              "border border-border",
-                              "bg-card hover:bg-muted/50 active:bg-muted",
-                              "transition-all duration-200"
-                            )}
-                            onClick={() => onItemClick(item)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => e.key === 'Enter' && onItemClick(item)}
-                            data-drag-handle="false"
-                          >
-                            <Icon icon="material-symbols:indeterminate-check-box" className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            <span className="truncate text-sm font-medium flex-1">{item.itemName}</span>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              <button
-                                type="button"
-                                className="p-1 rounded-md hover:bg-muted/50 active:bg-muted transition-colors"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  onItemClick(item)
-                                }}
-                                aria-label={`View details for ${item.itemName}`}
-                              >
-                                <Info className="h-4 w-4 text-muted-foreground" />
-                              </button>
-                              <button
-                                type="button"
-                                className="p-1 rounded-md hover:bg-muted/50 active:bg-muted transition-colors"
-                                onClick={(e) => handleMoveClick('item', item.id, item.itemName, e)}
-                                aria-label={`Move ${item.itemName}`}
-                              >
-                                <Move className="h-4 w-4 text-muted-foreground" />
-                              </button>
-                            </div>
-                          </div>
-                        </DraggableItem>
-                      ))}
-                    </div>
-                  </DroppableContainer>
-                )}
+                    <Move className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                  </button>
+                </div>
               </div>
-            </AccordionPrimitive.Content>
-          </AccordionPrimitive.Item>
+
+              {/* Expanded Content */}
+              {isExpanded && (
+                <div className="pl-4">
+                  {/* Nested Containers */}
+                  {hasChildren && container.children && (
+                    <div className="nested-container-list">
+                      {container.children.map(childContainer => renderContainer(childContainer, level + 1))}
+                    </div>
+                  )}
+
+                  {/* Items List */}
+                  {hasItems && container.items && (
+                    <DroppableContainer 
+                      key={`items-droppable-${container.id}-${container.items.length}`}
+                      containerId={container.id}
+                    >
+                      <div className="items-list pl-2">
+                        {container.items.map(item => (
+                          <DraggableItem
+                            key={item.id}
+                            item={item}
+                            containerId={container.id}
+                          >
+                            <div
+                              className="item-row flex items-center py-2 px-3 my-1 cursor-pointer hover:bg-muted rounded-md transition-all duration-200 active:scale-[0.98]"
+                              onClick={() => onItemClick(item)}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => e.key === 'Enter' && onItemClick(item)}
+                              data-drag-handle="false"
+                            >
+                              <Icon icon="material-symbols:indeterminate-check-box" className="h-5 w-5 mr-2 text-muted-foreground flex-shrink-0" />
+                              <span className="truncate text-sm text-muted-foreground flex-1">{item.itemName}</span>
+                              <div className="flex items-center gap-0.5 ml-2">
+                                <button
+                                  type="button"
+                                  className="p-1 rounded-md hover:bg-muted/50 active:bg-muted transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    onItemClick(item)
+                                  }}
+                                  aria-label={`View details for ${item.itemName}`}
+                                >
+                                  <Icon icon="material-symbols:info-outline" className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="p-1 rounded-md hover:bg-muted/50 active:bg-muted transition-colors"
+                                  onClick={(e) => handleMoveClick('item', item.id, item.itemName, e)}
+                                  aria-label={`Move ${item.itemName}`}
+                                >
+                                  <Move className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                                </button>
+                              </div>
+                            </div>
+                          </DraggableItem>
+                        ))}
+                      </div>
+                    </DroppableContainer>
+                  )}
+                </div>
+              )}
+            </div>
+          </DraggableContainer>
         </DroppableContainer>
-      </DraggableContainer>
+      </div>
     )
   }
 
-  // Get all expanded container IDs for Accordion
-  const expandedValues = Array.from(expandedContainers)
-
   return (
     <div className="mobile-accordion-view w-full h-full overflow-y-auto bg-background">
-      {/* Actions Bar - View All Items in same section */}
-      <div className="sticky top-0 z-10 bg-background border-b border-border px-3 py-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full flex items-center justify-center gap-2 h-9"
-          onClick={onViewAllItems}
-        >
-          <Icon icon="material-symbols:indeterminate-check-box" className="h-4 w-4" />
-          <span className="text-sm">View All Items</span>
-        </Button>
+      {/* Container List - uses same folder-tree styles as desktop */}
+      <div className="folder-tree p-2 bg-background">
+        <div className="container-list">
+          {containers.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              No folders found
+            </div>
+          ) : (
+            containers.map(container => renderContainer(container))
+          )}
+        </div>
       </div>
 
-      {/* Container List */}
-      <div className="bg-background">
-        <AccordionPrimitive.Root 
-          type="multiple" 
-          className="w-full"
-          value={expandedValues}
-          onValueChange={(values) => {
-            const newExpanded = new Set(values)
-            expandedContainers.forEach(id => {
-              if (!newExpanded.has(id)) {
-                onContainerToggle(id)
-              }
-            })
-            values.forEach(id => {
-              if (!expandedContainers.has(id)) {
-                onContainerToggle(id)
-              }
-            })
-          }}
-        >
-          {containers.map(container => renderContainer(container))}
-        </AccordionPrimitive.Root>
-      </div>
-
+      {/* Info Modal */}
       <LocationInfoModal
         open={showInfoModal}
         onClose={() => setShowInfoModal(false)}
@@ -308,8 +273,9 @@ export function MobileAccordionView({
         onEdit={handleEditContainer}
       />
 
+      {/* Move Modal */}
       <Dialog open={showMoveModal} onOpenChange={setShowMoveModal}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Move "{moveTarget?.name}"</DialogTitle>
             <DialogDescription>Select a destination folder</DialogDescription>

@@ -164,6 +164,17 @@ export function LocationInfoModal({
     stopCamera()
   }
 
+  // Recursively count all items in a container and its subcontainers
+  const getTotalItemCount = (cont: Container): number => {
+    let count = cont.items?.length || 0
+    if (cont.children && cont.children.length > 0) {
+      for (const child of cont.children) {
+        count += getTotalItemCount(child)
+      }
+    }
+    return count
+  }
+
   if (!container) return null
 
   return (
@@ -288,19 +299,26 @@ export function LocationInfoModal({
                 )}
 
                 <div className="grid gap-3">
-                  <div className="flex justify-between items-center py-2 border-b">
+                  <div className="flex flex-col py-2 border-b gap-1">
                     <span className="font-medium">Name:</span>
-                    <span className="text-right">{container.containerName}</span>
+                    <span style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{container.containerName}</span>
                   </div>
 
-                  <div className="flex justify-between items-center py-2 border-b">
+                  <div className="flex flex-col py-2 border-b gap-1">
                     <span className="font-medium">Location:</span>
-                    <span className="text-right">{container.containerLocation.path}</span>
+                    <span className="text-sm text-muted-foreground" style={{ overflowWrap: 'break-word', wordBreak: 'break-all' }}>
+                      {container.containerLocation.path.split('/').filter(Boolean).map((segment, index, arr) => (
+                        <span key={index}>
+                          /{segment}
+                          {index < arr.length - 1 && <wbr />}
+                        </span>
+                      ))}
+                    </span>
                   </div>
 
                   <div className="flex justify-between items-center py-2 border-b">
                     <span className="font-medium">Items:</span>
-                    <span className="text-right">{container.items?.length || 0}</span>
+                    <span className="text-right">{getTotalItemCount(container)}</span>
                   </div>
 
                   {container.description && (

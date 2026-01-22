@@ -37,7 +37,6 @@ export function Header({
 
   return (
     <header className="sticky top-0 z-50 w-full flex items-center px-4 py-3 shadow-lg bg-background/95 backdrop-blur-sm border-b border-border animate-in slide-in-from-top duration-300">
-      {/* Left: Logo and Title */}
       <div className="flex items-center">
         <img
           src={logo}
@@ -48,7 +47,6 @@ export function Header({
         <h1 className="text-xl font-semibold sm:hidden">Inventory</h1>
       </div>
 
-      {/* Center: Search Bar */}
       <div className="flex-1 flex justify-center">
         <div className="relative w-64">
           <SearchBar
@@ -59,7 +57,6 @@ export function Header({
         </div>
       </div>
 
-      {/* Right: Buttons */}
       <div className="flex items-center gap-2">
         {selectedItems.length > 0 ? (
           <>
@@ -82,7 +79,6 @@ export function Header({
           </>
         ) : (
           <>
-            {/* Normal Buttons */}
                   <Button
                     className="btn btn-outline btn-sm"
                     onClick={onAddItem}
