@@ -393,6 +393,7 @@ interface InventoryContextType {
   addItem: (item: Partial<Item>, containerId?: string) => void
   editItem: (item: Item) => void
   deleteItems: (itemIds: string[]) => void
+  deleteContainer: (containerId: string) => void
   addLocation: (location: Partial<Container>, parentId?: string) => void
   editLocation: (container: Container) => void
   moveItems: (itemIds: string[], targetContainerId: string) => void
@@ -408,6 +409,22 @@ interface InventoryContextType {
   undo: () => void
   canUndo: () => boolean
 }
+
+// Helper to recursively delete a container
+function deleteContainerFromTree(containers: Container[], containerId: string): Container[] {
+  return containers
+    .filter(container => container.id !== containerId)
+    .map(container => {
+      if (container.children && container.children.length > 0) {
+        return {
+          ...container,
+          children: deleteContainerFromTree(container.children, containerId)
+        }
+      }
+      return container
+    })
+}
+
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined)
 
@@ -547,6 +564,19 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     setSelectedItems(new Set())
     toast.success(`${itemIds.length} item${itemIds.length > 1 ? 's' : ''} deleted successfully`)
   }, [])
+
+  const deleteContainer = useCallback((containerId: string) => {
+    setContainers(prevContainers => {
+      if (!isUndoRedoRef.current) {
+        undoRedoManagerRef.current.saveState(prevContainers, `Delete container`)
+      }
+      return deleteContainerFromTree(prevContainers, containerId)
+    })
+    if (selectedContainer === containerId) {
+      setSelectedContainer(null)
+    }
+    toast.success("Location deleted successfully")
+  }, [selectedContainer])
 
   const addLocation = useCallback((location: Partial<Container>, parentId?: string) => {
     if (!location.containerName) {
@@ -792,6 +822,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     addItem,
     editItem,
     deleteItems,
+    deleteContainer,
     addLocation,
     editLocation,
     moveItems,

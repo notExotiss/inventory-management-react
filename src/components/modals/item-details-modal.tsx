@@ -31,6 +31,7 @@ interface ItemDetailsModalProps {
   item: Item | null
   onEdit: (item: Item) => void
   onAddItem: (item: Partial<Item>) => void
+  onDelete?: (itemId: string) => void
 }
 
 export function ItemDetailsModal({
@@ -38,8 +39,10 @@ export function ItemDetailsModal({
   onClose,
   item,
   onEdit,
-  onAddItem
+  onAddItem,
+  onDelete
 }: ItemDetailsModalProps) {
+  // ... (existing state) ...
   const [isEditing, setIsEditing] = React.useState(false)
   const [editedItem, setEditedItem] = React.useState<Partial<Item>>({})
   const [editedMeasurements, setEditedMeasurements] = React.useState({ size: "", unit: "" })
@@ -48,6 +51,7 @@ export function ItemDetailsModal({
   const [cameraActive, setCameraActive] = React.useState(false)
   const [cameraError, setCameraError] = React.useState<string | null>(null)
 
+  // ... (existing refs and effects) ...
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -84,6 +88,7 @@ export function ItemDetailsModal({
     }
   }, [open])
 
+  // ... (handlers) ...
   const handleSave = () => {
     if (item && editedItem) {
       const updatedItem: Item = {
@@ -115,6 +120,16 @@ export function ItemDetailsModal({
     }
   }
 
+  const handleDelete = () => {
+    if (item && onDelete) {
+      if (confirm("Are you sure you want to delete this item?")) {
+        onDelete(item.id)
+        onClose()
+      }
+    }
+  }
+
+  // ... (image handlers) ...
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -392,10 +407,17 @@ export function ItemDetailsModal({
           </div>
 
           <DialogFooter>
-            <div className="flex w-full justify-between">
-              <Button variant="outline" onClick={handleAddSimilar}>
-                Add Similar
-              </Button>
+            <div className="flex w-full justify-between items-center">
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleAddSimilar}>
+                  Add Similar
+                </Button>
+                {!isEditing && onDelete && (
+                  <Button variant="destructive" onClick={handleDelete}>
+                    Delete
+                  </Button>
+                )}
+              </div>
 
               <div className="flex gap-2">
                 {isEditing ? (

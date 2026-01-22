@@ -20,6 +20,7 @@ interface FolderTreeProps {
   onViewAllItems: () => void
   onItemClick: (item: Item) => void
   onContainerEdit?: (container: Container) => void
+  onContainerDelete?: (containerId: string) => void
 }
 
 export function FolderTree({
@@ -30,7 +31,8 @@ export function FolderTree({
   onContainerToggle,
   onViewAllItems,
   onItemClick,
-  onContainerEdit
+  onContainerEdit,
+  onContainerDelete
 }: FolderTreeProps) {
   const [showInfoModal, setShowInfoModal] = React.useState(false)
   const [selectedContainerForModal, setSelectedContainerForModal] = React.useState<Container | null>(null)
@@ -71,7 +73,7 @@ export function FolderTree({
     const folderIcon = getFolderIcon(container, isSelected, level)
 
     return (
-        <div key={`${container.id}-${container.containerName}`} className="container-wrapper">
+      <div key={`${container.id}-${container.containerName}`} className="container-wrapper">
         <DroppableContainer
           key={`droppable-${container.id}-${container.items?.length || 0}-${container.children?.length || 0}`}
           containerId={container.id}
@@ -88,96 +90,96 @@ export function FolderTree({
                 onKeyDown={(e) => e.key === 'Enter' && onContainerSelect(container.id)}
                 data-drag-handle="true"
               >
-              <div className="flex items-center w-full">
-                {isCollapsible && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="p-0 h-auto mr-1"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleContainer(container.id)
-                    }}
-                  >
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 transition-transform duration-200" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 transition-transform duration-200" />
-                    )}
-                  </Button>
-                )}
-                {!isCollapsible && <div className="w-5 mr-1" />}
-
-                <Icon
-                  icon={folderIcon}
-                  className={cn(
-                    "h-5 w-5 mr-2 transition-colors",
-                    isSelected ? "text-primary" : "text-foreground"
-                  )}
-                />
-                <span className="folder-name">{container.containerName}</span>
-
-                <div className="ml-auto flex">
-                  <button
-                    className="info-icon p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleContainerInfo(container)
-                    }}
-                    aria-label="View/edit location"
-                  >
-                    <Info className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {isExpanded && hasChildren && container.children && (
-              <div className="pl-4">
-                <div className="nested-container-list">
-                  {container.children.map(childContainer => renderContainer(childContainer, level + 1))}
-                </div>
-              </div>
-            )}
-
-            {isExpanded && hasItems && container.items && (
-              <DroppableContainer 
-                key={`items-droppable-${container.id}-${container.items.length}`}
-                containerId={container.id}
-              >
-                <div className="items-list pl-6">
-                  {container.items.map(item => (
-                    <DraggableItem
-                      key={item.id}
-                      item={item}
-                      containerId={container.id}
+                <div className="flex items-center w-full">
+                  {isCollapsible && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-0 h-auto mr-1"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleContainer(container.id)
+                      }}
                     >
-                      <div
-                        className="item-row flex items-center py-1 px-2 my-1 cursor-pointer hover:bg-muted rounded-md transition-all duration-300 animate-in fade-in slide-in-from-left-2 hover:scale-[1.02] hover:shadow-sm"
-                        onClick={() => onItemClick(item)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => e.key === 'Enter' && onItemClick(item)}
-                        data-drag-handle="false"
-                      >
-                        <Icon icon="material-symbols:indeterminate-check-box" className="h-5 w-5 mr-2 text-muted-foreground" />
-                        <span className="truncate text-sm text-muted-foreground flex-1">{item.itemName}</span>
-                        <button
-                          className="p-1 rounded-md hover:bg-muted/50 transition-all duration-200 hover:scale-110 ml-2"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onItemClick(item)
-                          }}
-                          aria-label={`View details for ${item.itemName}`}
-                        >
-                          <Icon icon="material-symbols:info-outline" className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
-                        </button>
-                      </div>
-                    </DraggableItem>
-                  ))}
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 transition-transform duration-200" />
+                      )}
+                    </Button>
+                  )}
+                  {!isCollapsible && <div className="w-5 mr-1" />}
+
+                  <Icon
+                    icon={folderIcon}
+                    className={cn(
+                      "h-5 w-5 mr-2 transition-colors",
+                      isSelected ? "text-primary" : "text-foreground"
+                    )}
+                  />
+                  <span className="folder-name">{container.containerName}</span>
+
+                  <div className="ml-auto flex">
+                    <button
+                      className="info-icon p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleContainerInfo(container)
+                      }}
+                      aria-label="View/edit location"
+                    >
+                      <Info className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                    </button>
+                  </div>
                 </div>
-              </DroppableContainer>
-            )}
+              </div>
+
+              {isExpanded && hasChildren && container.children && (
+                <div className="pl-4">
+                  <div className="nested-container-list">
+                    {container.children.map(childContainer => renderContainer(childContainer, level + 1))}
+                  </div>
+                </div>
+              )}
+
+              {isExpanded && hasItems && container.items && (
+                <DroppableContainer
+                  key={`items-droppable-${container.id}-${container.items.length}`}
+                  containerId={container.id}
+                >
+                  <div className="items-list pl-6">
+                    {container.items.map(item => (
+                      <DraggableItem
+                        key={item.id}
+                        item={item}
+                        containerId={container.id}
+                      >
+                        <div
+                          className="item-row flex items-center py-1 px-2 my-1 cursor-pointer hover:bg-muted rounded-md transition-all duration-300 animate-in fade-in slide-in-from-left-2 hover:scale-[1.02] hover:shadow-sm"
+                          onClick={() => onItemClick(item)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => e.key === 'Enter' && onItemClick(item)}
+                          data-drag-handle="false"
+                        >
+                          <Icon icon="material-symbols:indeterminate-check-box" className="h-5 w-5 mr-2 text-muted-foreground" />
+                          <span className="truncate text-sm text-muted-foreground flex-1">{item.itemName}</span>
+                          <button
+                            className="p-1 rounded-md hover:bg-muted/50 transition-all duration-200 hover:scale-110 ml-2"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onItemClick(item)
+                            }}
+                            aria-label={`View details for ${item.itemName}`}
+                          >
+                            <Icon icon="material-symbols:info-outline" className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
+                          </button>
+                        </div>
+                      </DraggableItem>
+                    ))}
+                  </div>
+                </DroppableContainer>
+              )}
             </div>
           </DraggableContainer>
         </DroppableContainer>
@@ -205,6 +207,7 @@ export function FolderTree({
         onClose={() => setShowInfoModal(false)}
         container={selectedContainerForModal}
         onEdit={handleEditContainer}
+        onDelete={onContainerDelete}
       />
     </div>
   )

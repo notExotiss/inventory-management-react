@@ -26,14 +26,17 @@ interface LocationInfoModalProps {
   onClose: () => void
   container: Container | null
   onEdit?: (container: Container) => void
+  onDelete?: (containerId: string) => void
 }
 
 export function LocationInfoModal({
   open,
   onClose,
   container,
-  onEdit
+  onEdit,
+  onDelete
 }: LocationInfoModalProps) {
+  // ... (existing state) ...
   const [isEditing, setIsEditing] = React.useState(false)
   const [editedContainer, setEditedContainer] = React.useState<Partial<Container>>({})
   const [image, setImage] = React.useState<string | null>(null)
@@ -76,6 +79,16 @@ export function LocationInfoModal({
       toast.success("Location updated successfully")
     }
   }
+
+  const handleDelete = () => {
+    if (container && onDelete) {
+      if (confirm("Are you sure you want to delete this location? All contents will be lost.")) {
+        onDelete(container.id)
+        onClose()
+      }
+    }
+  }
+
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -333,8 +346,14 @@ export function LocationInfoModal({
           </div>
 
           <DialogFooter>
-            <div className="flex w-full justify-between">
-              <div></div>
+            <div className="flex w-full justify-between items-center">
+              <div>
+                {!isEditing && onDelete && (
+                  <Button variant="destructive" onClick={handleDelete}>
+                    Delete
+                  </Button>
+                )}
+              </div>
 
               <div className="flex gap-2">
                 {isEditing ? (

@@ -28,6 +28,7 @@ function InventoryApp() {
     addItem,
     editItem,
     deleteItems,
+    deleteContainer,
     addLocation,
     editLocation,
     moveItems,
@@ -42,9 +43,9 @@ function InventoryApp() {
     undo,
     canUndo
   } = useInventory()
-  
+
   const [dndKey, setDndKey] = useState(0)
-  
+
   const [isMobile, setIsMobile] = useState(false)
   const [showAllItemsView, setShowAllItemsView] = useState(false)
 
@@ -56,7 +57,7 @@ function InventoryApp() {
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
-  
+
   const handleUndo = () => {
     undo()
     setTimeout(() => {
@@ -114,8 +115,8 @@ function InventoryApp() {
       const containerId = active.id as string
       const targetContainerId = over.id as string
 
-      console.log('Container drag detected:', { 
-        containerId, 
+      console.log('Container drag detected:', {
+        containerId,
         targetContainerId,
         activeData: activeData.container,
         overData: overData.containerId
@@ -123,9 +124,9 @@ function InventoryApp() {
 
       if (containerId && targetContainerId && containerId !== targetContainerId) {
         const sourceContainer = activeData.container || findContainerById(containerId)
-        
+
         const targetContainer = overData.container || findContainerById(targetContainerId)
-        
+
         console.log('Container lookup:', {
           containerId,
           targetContainerId,
@@ -138,7 +139,7 @@ function InventoryApp() {
           containersLength: containers.length,
           allContainerIds: getAllContainerIds(containers)
         })
-        
+
         if (sourceContainer && targetContainer) {
           const isChild = (parent: Container, childId: string): boolean => {
             if (parent.children) {
@@ -149,11 +150,11 @@ function InventoryApp() {
             }
             return false
           }
-          
+
           if (sourceContainer.parentId === targetContainerId) {
             return
           }
-          
+
           if (!isChild(sourceContainer, targetContainerId)) {
             console.log('Moving container:', containerId, 'to parent:', targetContainerId)
             moveContainerBetweenContainers(containerId, targetContainerId)
@@ -295,6 +296,7 @@ function InventoryApp() {
                   onMoveContainer={(containerId, targetContainerId) => {
                     moveContainerBetweenContainers(containerId, targetContainerId)
                   }}
+                  onContainerDelete={deleteContainer}
                 />
               )}
             </div>
@@ -329,6 +331,7 @@ function InventoryApp() {
                     setShowItemDetailsModal(true)
                   }}
                   onContainerEdit={editLocation}
+                  onContainerDelete={deleteContainer}
                 />
               </div>
 
@@ -386,50 +389,51 @@ function InventoryApp() {
           </>
         )}
 
-      <AddItemModal
-        open={showAddItemModal}
-        onClose={() => setShowAddItemModal(false)}
-        onAddItem={handleAddItem}
-        defaultLocation={selectedContainer
-          ? findContainerById(selectedContainer)?.containerLocation.path || ''
-          : ''}
-      />
+        <AddItemModal
+          open={showAddItemModal}
+          onClose={() => setShowAddItemModal(false)}
+          onAddItem={handleAddItem}
+          defaultLocation={selectedContainer
+            ? findContainerById(selectedContainer)?.containerLocation.path || ''
+            : ''}
+        />
 
-      <NewLocationModal
-        open={showAddLocationModal}
-        onClose={() => setShowAddLocationModal(false)}
-        onAddLocation={handleAddLocation}
-      />
+        <NewLocationModal
+          open={showAddLocationModal}
+          onClose={() => setShowAddLocationModal(false)}
+          onAddLocation={handleAddLocation}
+        />
 
-      <GroupItemsModal
-        open={showGroupModal}
-        onClose={() => setShowGroupModal(false)}
-        onGroup={handleGroupItems}
-        containers={containers}
-        selectedItems={Array.from(selectedItems).map(id => {
-          const container = findContainerById(selectedContainer || '')
-          if (container && container.items) {
-            const item = container.items.find(item => item.id === id)
-            if (item) return item
-          }
-          return { id, itemName: 'Unknown item', itemLocation: { path: '' } }
-        })}
-      />
+        <GroupItemsModal
+          open={showGroupModal}
+          onClose={() => setShowGroupModal(false)}
+          onGroup={handleGroupItems}
+          containers={containers}
+          selectedItems={Array.from(selectedItems).map(id => {
+            const container = findContainerById(selectedContainer || '')
+            if (container && container.items) {
+              const item = container.items.find(item => item.id === id)
+              if (item) return item
+            }
+            return { id, itemName: 'Unknown item', itemLocation: { path: '' } }
+          })}
+        />
 
-      <HelpModal
-        open={showHelpModal}
-        onClose={() => setShowHelpModal(false)}
-      />
+        <HelpModal
+          open={showHelpModal}
+          onClose={() => setShowHelpModal(false)}
+        />
 
-      <ItemDetailsModal
-        open={showItemDetailsModal}
-        onClose={() => {
-          setShowItemDetailsModal(false)
-        }}
-        item={activeItem}
-        onEdit={editItem}
-        onAddItem={addItem}
-      />
+        <ItemDetailsModal
+          open={showItemDetailsModal}
+          onClose={() => {
+            setShowItemDetailsModal(false)
+          }}
+          item={activeItem}
+          onEdit={editItem}
+          onAddItem={addItem}
+          onDelete={(itemId) => deleteItems([itemId])}
+        />
       </div>
     </DndProviderWrapper>
   )

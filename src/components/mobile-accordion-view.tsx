@@ -24,6 +24,7 @@ interface MobileAccordionViewProps {
   onContainerEdit?: (container: Container) => void
   onMoveItem?: (itemId: string, targetContainerId: string) => void
   onMoveContainer?: (containerId: string, targetContainerId: string) => void
+  onContainerDelete?: (containerId: string) => void
 }
 
 export function MobileAccordionView({
@@ -36,7 +37,8 @@ export function MobileAccordionView({
   onItemClick,
   onContainerEdit,
   onMoveItem,
-  onMoveContainer
+  onMoveContainer,
+  onContainerDelete
 }: MobileAccordionViewProps) {
   const [showInfoModal, setShowInfoModal] = React.useState(false)
   const [showMoveModal, setShowMoveModal] = React.useState(false)
@@ -102,11 +104,11 @@ export function MobileAccordionView({
           container={container}
         >
           <DraggableContainer container={container}>
-            <div 
+            <div
               className={cn(
                 "folder-item relative",
                 isSelected && "folder-selected"
-              )} 
+              )}
               data-container-id={container.id}
             >
               {/* Folder Header - MUST have folder-header class for DnD to work */}
@@ -151,7 +153,7 @@ export function MobileAccordionView({
                     isSelected ? "text-primary" : "text-foreground"
                   )}
                 />
-                
+
                 {/* Folder Name */}
                 <span className={cn(
                   "folder-name flex-1 truncate text-sm font-medium",
@@ -193,7 +195,7 @@ export function MobileAccordionView({
 
                   {/* Items List */}
                   {hasItems && container.items && (
-                    <DroppableContainer 
+                    <DroppableContainer
                       key={`items-droppable-${container.id}-${container.items.length}`}
                       containerId={container.id}
                     >
@@ -271,6 +273,7 @@ export function MobileAccordionView({
         onClose={() => setShowInfoModal(false)}
         container={selectedContainerForModal}
         onEdit={handleEditContainer}
+        onDelete={onContainerDelete}
       />
 
       {/* Move Modal */}
@@ -287,8 +290,8 @@ export function MobileAccordionView({
               expandedContainers={expandedContainers}
               onContainerSelect={(id) => handleMoveToContainer(id)}
               onContainerToggle={onContainerToggle}
-              onViewAllItems={() => {}}
-              onItemClick={() => {}}
+              onViewAllItems={() => { }}
+              onItemClick={() => { }}
               onContainerEdit={onContainerEdit}
             />
           </div>
