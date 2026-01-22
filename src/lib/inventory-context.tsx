@@ -230,18 +230,17 @@ function updateItemInContainers(containers: Container[], updatedItem: Item): Con
 
 function deleteItemsFromContainers(containers: Container[], itemIds: string[]): Container[] {
   return containers.map(container => {
-    if (container.items) {
-      return {
-        ...container,
-        items: container.items.filter(item => !itemIds.includes(item.id))
-      }
-    } else if (container.children && container.children.length > 0) {
-      return {
-        ...container,
-        children: deleteItemsFromContainers(container.children, itemIds)
-      }
+    let newContainer = { ...container }
+
+    if (newContainer.items) {
+      newContainer.items = newContainer.items.filter(item => !itemIds.includes(item.id))
     }
-    return container
+
+    if (newContainer.children && newContainer.children.length > 0) {
+      newContainer.children = deleteItemsFromContainers(newContainer.children, itemIds)
+    }
+
+    return newContainer
   })
 }
 
@@ -420,12 +419,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [expandedContainers, setExpandedContainers] = useState<Set<string>>(initialState.expandedContainers)
   const [isLoading, setIsLoading] = useState(true)
   const [firestoreError, setFirestoreError] = useState<string | null>(null)
-  
+
   const undoRedoManagerRef = useRef(new (require('./undo-redo').UndoRedoManager)())
   const isUndoRedoRef = useRef(false)
   const isInitialLoadRef = useRef(true)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  
+
   useEffect(() => {
     const unsubscribe = subscribeToContainers(
       (firestoreContainers) => {
@@ -459,11 +458,11 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoading || isInitialLoadRef.current) return
-    
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
-    
+
     saveTimeoutRef.current = setTimeout(() => {
       saveContainers(containers).catch((err) => {
         console.error("Failed to save to Firestore:", err)
@@ -529,7 +528,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       if (!isUndoRedoRef.current) {
         undoRedoManagerRef.current.saveState(prevContainers, `Edit item: ${updatedItem.itemName}`)
       }
-      
+
       const updated = updateItemInContainers(prevContainers, updatedItem)
       return [...updated]
     })
@@ -609,23 +608,23 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     setContainers(prevContainers => {
       const sourceExists = findContainerById(prevContainers, sourceContainerId)
       const targetExists = findContainerById(prevContainers, targetContainerId)
-      
+
       if (!sourceExists) {
         console.error('Source container not found:', sourceContainerId)
         toast.error("Source folder not found")
         return prevContainers
       }
-      
+
       if (!targetExists) {
         console.error('Target container not found:', targetContainerId)
         toast.error("Target folder not found")
         return prevContainers
       }
-      
+
       if (!isUndoRedoRef.current) {
         undoRedoManagerRef.current.saveState(prevContainers, 'Move item')
       }
-      
+
       const updated = moveItemsBetweenContainers(prevContainers, [itemId], sourceContainerId, targetContainerId)
       console.log('Items moved, containers updated')
       return [...updated]
@@ -638,30 +637,30 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     setContainers(prevContainers => {
       const containerExists = findContainerById(prevContainers, containerId)
       const targetExists = findContainerById(prevContainers, targetParentId)
-      
+
       console.log('Container existence check:', {
         containerExists: !!containerExists,
         targetExists: !!targetExists,
         containerId,
         targetParentId
       })
-      
+
       if (!containerExists) {
         console.error('Container to move not found:', containerId)
         toast.error("Source folder not found")
         return prevContainers
       }
-      
+
       if (!targetExists) {
         console.error('Target container not found:', targetParentId)
         toast.error("Target folder not found")
         return prevContainers
       }
-      
+
       if (!isUndoRedoRef.current) {
         undoRedoManagerRef.current.saveState(prevContainers, 'Move folder')
       }
-      
+
       const updated = moveContainerHelper(prevContainers, containerId, targetParentId)
       console.log('Containers updated, new length:', updated.length)
       return [...updated]
@@ -701,7 +700,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 
   const getFilteredItems = useCallback((): Item[] => {
     const { fuzzyMatch, getMatchScore } = require('./fuzzy-search')
-    
+
     if (!selectedContainer) {
       const allItems: Item[] = []
       const collectItems = (containers: Container[]) => {
@@ -715,15 +714,15 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         })
       }
       collectItems(containers)
-      
+
       if (!searchQuery.trim()) return allItems
-      
+
       const filtered = allItems.filter(item =>
         fuzzyMatch(searchQuery, item.itemName) ||
         fuzzyMatch(searchQuery, item.description || '') ||
         fuzzyMatch(searchQuery, item.itemLocation.path)
       )
-      
+
       return filtered.sort((a, b) => {
         const scoreA = Math.max(
           getMatchScore(searchQuery, a.itemName),
@@ -749,7 +748,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       fuzzyMatch(searchQuery, item.description || '') ||
       fuzzyMatch(searchQuery, item.itemLocation.path)
     )
-    
+
     return filtered.sort((a, b) => {
       const scoreA = Math.max(
         getMatchScore(searchQuery, a.itemName),
