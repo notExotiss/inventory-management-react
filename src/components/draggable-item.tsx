@@ -49,6 +49,7 @@ export function DraggableItem({ item, containerId, children, asTableRow = false 
       style: { ...style, ...childProps.style },
       ...attributes,
       className: `${childProps.className || ''} cursor-grab active:cursor-grabbing`,
+      'data-item-id': item.id,
       onPointerDown: (e: React.PointerEvent) => {
         // Stop propagation to prevent container drag
         e.stopPropagation()
@@ -89,6 +90,7 @@ export function DraggableItem({ item, containerId, children, asTableRow = false 
       style: { ...style, ...childProps.style },
       ...attributes,
       className: `${childProps.className || ''} cursor-grab active:cursor-grabbing`,
+      'data-item-id': item.id,
       onPointerDown: (e: React.PointerEvent) => {
         // Stop propagation to prevent container drag, but allow item drag
         const target = e.target as HTMLElement

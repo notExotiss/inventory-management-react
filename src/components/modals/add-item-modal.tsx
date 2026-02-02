@@ -28,13 +28,15 @@ interface AddItemModalProps {
   onClose: () => void
   onAddItem: (item: any) => void
   defaultLocation?: string
+  locationOptions?: string[]
 }
 
 export function AddItemModal({
   open,
   onClose,
   onAddItem,
-  defaultLocation = ""
+  defaultLocation = "",
+  locationOptions = []
 }: AddItemModalProps) {
   const [itemName, setItemName] = React.useState("")
   const [description, setDescription] = React.useState("")
@@ -53,6 +55,20 @@ export function AddItemModal({
   React.useEffect(() => {
     setLocation(defaultLocation)
   }, [defaultLocation])
+
+  const locationOptionsWithDefault = React.useMemo(() => {
+    const unique = new Set<string>()
+    unique.add("")
+    locationOptions.forEach(option => unique.add(option))
+    if (defaultLocation) {
+      unique.add(defaultLocation)
+    }
+    return Array.from(unique).sort((a, b) => {
+      if (a === "") return -1
+      if (b === "") return 1
+      return a.localeCompare(b)
+    })
+  }, [locationOptions, defaultLocation])
 
   React.useEffect(() => {
     if (!open) {
@@ -243,13 +259,21 @@ export function AddItemModal({
                 <Label htmlFor="location" className="text-right">
                   Location
                 </Label>
-                <Input
+                <select
                   id="location"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="col-span-3"
-                  placeholder="Enter location path"
-                />
+                  className="col-span-3 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                >
+                  <option value="">/ (Root)</option>
+                  {locationOptionsWithDefault
+                    .filter(option => option !== "")
+                    .map(option => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-4 items-start gap-4">
